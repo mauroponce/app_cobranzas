@@ -1,0 +1,54 @@
+name: Backend
+on:
+  push:
+    paths: ['apps/backend/**', 'infra/docker/**', 'compose.yaml', '.github/workflows/backend.yml']
+  pull_request:
+    paths: ['apps/backend/**', 'infra/docker/**', 'compose.yaml', '.github/workflows/backend.yml']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: app_cobranzas_test
+          POSTGRES_USER: app_cobranzas
+          POSTGRES_PASSWORD: testing-only-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U app_cobranzas -d app_cobranzas_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+    defaults:
+      run:
+        working-directory: apps/backend
+    env:
+      APP_ENV: testing
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: app_cobranzas_test
+      DB_USERNAME: app_cobranzas
+      DB_PASSWORD: testing-only-password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, pgsql, intl, zip, pcntl
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/backend/package-lock.json
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: cp .env.example .env
+      - run: php artisan key:generate
+      - run: npm ci
+      - run: npm run build
+      - run: php artisan test
+      - run: ./vendor/bin/pint --test

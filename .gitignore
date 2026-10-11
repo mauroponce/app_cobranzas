@@ -1,0 +1,13 @@
+/.env
+/apps/backend/.env
+/apps/backend/vendor/
+/apps/backend/node_modules/
+/apps/backend/public/build/
+/apps/backend/database/database.sqlite
+/apps/backend/storage/logs/*.log
+/apps/mobile/node_modules/
+/apps/mobile/.env
+/apps/mobile/.expo/
+/apps/mobile/android/
+/apps/mobile/ios/
+*.local

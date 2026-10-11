@@ -1,0 +1,9 @@
+.git
+**/.env
+**/vendor
+**/node_modules
+**/public/build
+**/database/*.sqlite
+**/storage/logs/*.log
+apps/mobile
+docs

@@ -34,10 +34,11 @@ final class PaymentService
 
     public function declareTransfer(Tenant $tenant, User $actor, array $data): Payment
     {
-        $this->require($tenant, $actor, 'payments.create');
+        $membership = $this->require($tenant, $actor, 'payments.create');
 
-        return DB::transaction(function () use ($tenant, $actor, $data): Payment {
+        return DB::transaction(function () use ($tenant, $actor, $data, $membership): Payment {
             $customer = $this->customer($tenant, $data['customer_id']);
+            abort_unless(app(CollectionPortfolioService::class)->canCollect($tenant, $membership, $customer), 403);
             $amount = $this->positive($data['amount']);
             $payment = Payment::create([
                 'tenant_id' => $tenant->id, 'customer_id' => $customer->id, 'received_by' => $actor->id,
@@ -115,9 +116,9 @@ final class PaymentService
             abort(403);
         }
 
-        return DB::transaction(function () use ($tenant, $actor, $data, $fromSync, $authorized, $decision): Payment {
+        return DB::transaction(function () use ($tenant, $actor, $data, $fromSync, $authorized, $membership): Payment {
             $customer = $this->customer($tenant, $data['customer_id']);
-            if ($authorized && $decision['scope'] !== 'all') {
+            if ($authorized && ! app(CollectionPortfolioService::class)->canCollect($tenant, $membership, $customer)) {
                 abort(403);
             }
             $amount = $this->positive($data['amount']);
@@ -195,10 +196,12 @@ final class PaymentService
         }
     }
 
-    private function require(Tenant $tenant, User $actor, string $capability): void
+    private function require(Tenant $tenant, User $actor, string $capability): TenantMembership
     {
         $membership = TenantMembership::forTenant($tenant)->where('user_id', $actor->id)->where('status', 'active')->first();
         abort_unless($membership && app(AuthorizationService::class)->allows($membership, $capability), 403);
+
+        return $membership;
     }
 
     private function customer(Tenant $tenant, string $id): Customer

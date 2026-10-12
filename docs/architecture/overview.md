@@ -43,6 +43,10 @@ PostgreSQL Row Level Security es una capa futura de defensa en profundidad. Ante
 
 Para agregar un módulo, declarar capacidades estables en `RoleMatrix`, asignarlas por rol, definir Gates/Policies y probar accesos autorizados, denegados y cruzados entre empresas.
 
+## Etapa 6: carteras de cobranza
+
+Las carteras, equipos y zonas se documentan en [carteras de cobranza](collection-portfolios.md). La asignación de cobrador es independiente de la relación comercial con el vendedor. Las consultas de cobros, el registro de pagos y `/sync/pull` aplican los scopes `assigned`, `team` y `all` sobre asignaciones activas de la empresa.
+
 ## Verificación
 
 `make migrate`, `make seed` y `make test` ejecutan migraciones, datos locales y pruebas PostgreSQL. `docker compose exec app ./vendor/bin/pint --test` comprueba formato. En desarrollo, el panel está en `http://localhost:8080` y Mailpit en `http://localhost:8025`.

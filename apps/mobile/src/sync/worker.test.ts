@@ -76,4 +76,18 @@ describe('sync worker', () => {
     await Promise.all([first, second]);
     expect(mockedPost).toHaveBeenCalledTimes(1);
   });
+
+  it('removes a revoked portfolio from the cache without deleting pending financial operations', async () => {
+    await enqueue();
+    mockedPost.mockResolvedValue({ data: { operations: [{ operation_id: 'operation-1', status: 'applied', payment_id: 'payment-1' }] } });
+    mockedGet.mockResolvedValueOnce({ ...pull(), data: { ...pull().data, portfolio_version: 1 } });
+    await syncNow(session);
+    await enqueue('operation-2');
+    mockedGet.mockResolvedValueOnce({ data: { customers: [], obligations: [], cursor: 0, has_more: false, reset: true, portfolio_version: 2 } });
+    mockedPost.mockResolvedValue({ data: { operations: [{ operation_id: 'operation-2', status: 'under_review' }] } });
+    await syncNow(session, { force: true });
+    expect(sqliteRows().customers.size).toBe(0);
+    expect(sqliteRows().outbox.get('operation-2')).toMatchObject({ status: 'under_review' });
+    expect(await getMetadata('sync:portfolio_version:tenant-a:user-a')).toBe('2');
+  });
 });

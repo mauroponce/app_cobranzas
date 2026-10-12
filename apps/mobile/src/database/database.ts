@@ -22,6 +22,9 @@ export function initializeDatabase(): Promise<SQLite.SQLiteDatabase> {
         scope_key TEXT NOT NULL, id TEXT NOT NULL, name TEXT NOT NULL, status TEXT NOT NULL, updated_at TEXT,
         PRIMARY KEY (scope_key, id)
       )`);
+      for (const column of ['collector_name TEXT', 'zone_name TEXT', 'assignment_status TEXT']) {
+        try { await database.execAsync(`ALTER TABLE authorized_customers ADD COLUMN ${column}`); } catch {}
+      }
       await database.execAsync(`CREATE TABLE IF NOT EXISTS local_payments (
         operation_id TEXT PRIMARY KEY NOT NULL, scope_key TEXT NOT NULL, customer_id TEXT NOT NULL,
         amount TEXT NOT NULL, status TEXT NOT NULL, payment_id TEXT, recorded_at TEXT NOT NULL, result TEXT

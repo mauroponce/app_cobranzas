@@ -58,7 +58,9 @@ const database = {
     }
     if (sql.startsWith('INSERT OR REPLACE INTO app_metadata')) { state.metadata.set(String(parameters[0]), String(parameters[1])); return; }
     if (sql.startsWith('DELETE FROM app_metadata')) { state.metadata.delete(String(parameters[0])); return; }
-    if (sql.includes('authorized_customers')) { const [scope, id, name, status, updatedAt] = parameters as string[]; state.customers.set(`${scope}:${id}`, { scope_key: scope, id, name, status, updated_at: updatedAt }); return; }
+    if (sql.startsWith('DELETE FROM authorized_customers')) { for (const [key, row] of state.customers) if (row.scope_key === parameters[0]) state.customers.delete(key); return; }
+    if (sql.startsWith('DELETE FROM authorized_obligations')) { for (const [key, row] of state.obligations) if (row.scope_key === parameters[0]) state.obligations.delete(key); return; }
+    if (sql.includes('authorized_customers')) { const [scope, id, name, status, updatedAt, collectorName, zoneName, assignmentStatus] = parameters as string[]; state.customers.set(`${scope}:${id}`, { scope_key: scope, id, name, status, updated_at: updatedAt, collector_name: collectorName, zone_name: zoneName, assignment_status: assignmentStatus }); return; }
     if (sql.includes('authorized_obligations')) { const [scope, id, customerId, amount, dueDate, entryType] = parameters as string[]; state.obligations.set(`${scope}:${id}`, { scope_key: scope, id, customer_id: customerId, outstanding_amount: amount, due_date: dueDate, entry_type: entryType }); return; }
     throw new Error(`Unsupported SQL: ${sql}`);
   },

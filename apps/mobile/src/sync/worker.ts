@@ -18,7 +18,24 @@ export async function syncNow(session: Session, options: SyncOptions = {}): Prom
       await db.withTransactionAsync(async () => { for (const result of response.data.operations) { const status = result.status === 'applied' ? 'confirmed' : result.status; await db.runAsync('UPDATE offline_outbox SET status = ?, synced_at = ?, last_error = ? WHERE operation_id = ?', status, new Date().toISOString(), result.error ?? null, result.operation_id); await db.runAsync('UPDATE local_payments SET status = ?, payment_id = ?, result = ? WHERE operation_id = ?', status, result.payment_id ?? null, JSON.stringify(result), result.operation_id); } });
       if (response.data.operations.length !== rows.length) throw new Error('Respuesta parcial de sincronización');
     }
-    let cursor = Number((await db.getFirstAsync<{ value: string }>('SELECT value FROM app_metadata WHERE key = ?', `sync:cursor:${scope}`))?.value ?? 0); do { const pull = await apiGet<{ data: { customers: { id: string; first_name: string; last_name: string; status: string; updated_at: string }[]; obligations: { id: string; customer_id: string; outstanding_amount: string; due_date: string | null; entry_type: string }[]; cursor: number; has_more: boolean } }>(`/sync/pull?cursor=${cursor}`, session.token); await db.withTransactionAsync(async () => { for (const customer of pull.data.customers) await db.runAsync('INSERT OR REPLACE INTO authorized_customers (scope_key,id,name,status,updated_at) VALUES (?,?,?,?,?)', scope, customer.id, `${customer.last_name}, ${customer.first_name}`, customer.status, customer.updated_at); for (const entry of pull.data.obligations) await db.runAsync('INSERT OR REPLACE INTO authorized_obligations (scope_key,id,customer_id,outstanding_amount,due_date,entry_type) VALUES (?,?,?,?,?,?)', scope, entry.id, entry.customer_id, entry.outstanding_amount, entry.due_date, entry.entry_type); await db.runAsync('INSERT OR REPLACE INTO app_metadata (key, value) VALUES (?, ?)', `sync:cursor:${scope}`, String(pull.data.cursor)); }); cursor = pull.data.cursor; if (!pull.data.has_more) break; } while (true);
+    let cursor = Number((await db.getFirstAsync<{ value: string }>('SELECT value FROM app_metadata WHERE key = ?', `sync:cursor:${scope}`))?.value ?? 0);
+    let portfolioVersion = (await db.getFirstAsync<{ value: string }>('SELECT value FROM app_metadata WHERE key = ?', `sync:portfolio_version:${scope}`))?.value;
+    do {
+      const pull = await apiGet<{ data: { customers: { id: string; first_name: string; last_name: string; status: string; updated_at: string; collector_name?: string | null; zone_name?: string | null; assignment_status?: string | null }[]; obligations: { id: string; customer_id: string; outstanding_amount: string; due_date: string | null; entry_type: string }[]; cursor: number; has_more: boolean; reset?: boolean; portfolio_version?: number } }>(`/sync/pull?cursor=${cursor}${portfolioVersion ? `&portfolio_version=${encodeURIComponent(portfolioVersion)}` : ''}`, session.token);
+      await db.withTransactionAsync(async () => {
+        if (pull.data.reset) {
+          await db.runAsync('DELETE FROM authorized_obligations WHERE scope_key = ?', scope);
+          await db.runAsync('DELETE FROM authorized_customers WHERE scope_key = ?', scope);
+        }
+        for (const customer of pull.data.customers) await db.runAsync('INSERT OR REPLACE INTO authorized_customers (scope_key,id,name,status,updated_at,collector_name,zone_name,assignment_status) VALUES (?,?,?,?,?,?,?,?)', scope, customer.id, `${customer.last_name}, ${customer.first_name}`, customer.status, customer.updated_at, customer.collector_name ?? null, customer.zone_name ?? null, customer.assignment_status ?? null);
+        for (const entry of pull.data.obligations) await db.runAsync('INSERT OR REPLACE INTO authorized_obligations (scope_key,id,customer_id,outstanding_amount,due_date,entry_type) VALUES (?,?,?,?,?,?)', scope, entry.id, entry.customer_id, entry.outstanding_amount, entry.due_date, entry.entry_type);
+        await db.runAsync('INSERT OR REPLACE INTO app_metadata (key, value) VALUES (?, ?)', `sync:cursor:${scope}`, String(pull.data.cursor));
+        if (pull.data.portfolio_version !== undefined) await db.runAsync('INSERT OR REPLACE INTO app_metadata (key, value) VALUES (?, ?)', `sync:portfolio_version:${scope}`, String(pull.data.portfolio_version));
+      });
+      cursor = pull.data.cursor;
+      portfolioVersion = pull.data.portfolio_version === undefined ? portfolioVersion : String(pull.data.portfolio_version);
+      if (!pull.data.has_more) break;
+    } while (true);
     await db.runAsync('INSERT OR REPLACE INTO app_metadata (key, value) VALUES (?, ?)', `sync:last_success:${scope}`, new Date().toISOString());
     await db.runAsync('DELETE FROM app_metadata WHERE key = ?', `sync:last_error:${scope}`);
   } catch (error) {

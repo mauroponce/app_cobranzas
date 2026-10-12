@@ -37,6 +37,21 @@ class Customer extends Model
         return $this->hasMany(CustomerDocument::class);
     }
 
+    public function collectorAssignments(): HasMany
+    {
+        return $this->hasMany(CustomerCollectorAssignment::class);
+    }
+
+    public function zoneAssignments(): HasMany
+    {
+        return $this->hasMany(CustomerCollectionZoneAssignment::class);
+    }
+
+    public function accountEntries(): HasMany
+    {
+        return $this->hasMany(CustomerAccountEntry::class);
+    }
+
     protected $table = 'customers';
 
     protected $fillable = ['tenant_id', 'customer_number', 'first_name', 'last_name', 'document_type', 'document_number', 'document_normalized', 'email', 'phone', 'whatsapp_phone', 'birth_date', 'notes', 'status', 'created_by'];

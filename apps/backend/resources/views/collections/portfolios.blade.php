@@ -1,0 +1,1 @@
+<x-layouts.app title="Carteras de cobranza"><div class="mb-6"><h1 class="admin-title">Carteras de cobranza</h1><p class="admin-muted mt-1">Asigná cobradores habituales sin modificar la deuda del cliente.</p></div><livewire:collection-portfolio-manager /></x-layouts.app>

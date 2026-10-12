@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Collections\CollectionPortfolioService;
 use App\Domain\Collections\PaymentService;
 use App\Domain\Tenancy\AuthorizationService;
 use App\Models\Customer;
@@ -34,18 +35,30 @@ class SyncApiController extends Controller
         return response()->json(['data' => ['operations' => $results]]);
     }
 
-    public function pull(Request $request, AuthorizationService $authorization): JsonResponse
+    public function pull(Request $request, CollectionPortfolioService $portfolio, AuthorizationService $authorization): JsonResponse
     {
         $tenant = $request->attributes->get('activeTenant');
         $membership = $request->attributes->get('activeMembership');
-        abort_unless($authorization->allows($membership, 'customers.view'), 403);
-        abort_unless($authorization->decision($membership, 'customers.view')['scope'] === 'all', 403);
-        $cursor = (int) $request->validate(['cursor' => ['nullable', 'integer', 'min:0']])['cursor'];
-        $customers = Customer::forTenant($tenant)->orderBy('created_at')->offset($cursor)->limit(100)->get(['id', 'customer_number', 'first_name', 'last_name', 'status', 'updated_at']);
+        $data = $request->validate(['cursor' => ['nullable', 'integer', 'min:0'], 'portfolio_version' => ['nullable', 'integer', 'min:1']]);
+        $reset = isset($data['portfolio_version']) && (int) $data['portfolio_version'] !== (int) $tenant->authorization_version;
+        $cursor = $reset ? 0 : (int) ($data['cursor'] ?? 0);
+        $canViewAssignments = $authorization->allows($membership, 'customers.view_assignments');
+        $customers = $portfolio->customers($tenant, $membership)->with($canViewAssignments ? ['collectorAssignments' => fn ($query) => $query->whereNull('unassigned_at')->with('collectorMembership.user'), 'zoneAssignments' => fn ($query) => $query->whereNull('unassigned_at')->with('zone')] : [])->orderBy('customers.created_at')->offset($cursor)->limit(100)->get(['id', 'customer_number', 'first_name', 'last_name', 'status', 'updated_at'])->map(function (Customer $customer) use ($canViewAssignments): array {
+            $data = $customer->only(['id', 'customer_number', 'first_name', 'last_name', 'status', 'updated_at']);
+            if ($canViewAssignments) {
+                $assignment = $customer->collectorAssignments->first();
+                $zone = $customer->zoneAssignments->first()?->zone;
+                $data['collector_name'] = $assignment?->collectorMembership?->user?->name;
+                $data['zone_name'] = $zone?->name;
+                $data['assignment_status'] = $assignment ? 'assigned' : 'unassigned';
+            }
+
+            return $data;
+        });
         $ids = $customers->pluck('id');
         $entries = CustomerAccountEntry::forTenant($tenant)->whereIn('customer_id', $ids)->where('status', 'open')->orderBy('due_date')->get(['id', 'customer_id', 'sale_id', 'installment_id', 'entry_type', 'outstanding_amount', 'due_date']);
 
-        return response()->json(['data' => ['customers' => $customers, 'obligations' => $entries, 'cursor' => $cursor + $customers->count(), 'has_more' => $customers->count() === 100]]);
+        return response()->json(['data' => ['customers' => $customers, 'obligations' => $entries, 'cursor' => $cursor + $customers->count(), 'has_more' => $customers->count() === 100, 'reset' => $reset, 'portfolio_version' => $tenant->authorization_version]]);
     }
 
     private function process($tenant, $actor, object $device, array $operation, PaymentService $payments): array

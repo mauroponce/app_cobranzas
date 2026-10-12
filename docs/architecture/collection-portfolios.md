@@ -1,0 +1,11 @@
+# Carteras de cobranza
+
+La cartera de cobranza es una asignación explícita de un cliente a una membresía cobradora activa. No se deriva del vendedor de la venta. `customer_collector_assignments` conserva el historial; PostgreSQL permite una sola asignación activa por cliente mediante un índice parcial.
+
+`assigned` permite acceder solo a clientes cuya asignación activa apunta a la membresía actual. `team` permite acceder a los clientes asignados a cobradores que pertenezcan a un equipo activo supervisado por la membresía actual. `all` conserva el acceso total dentro de la empresa. El scope `own` comercial mantiene su significado de vendedor, pero no habilita cobros.
+
+Una reasignación o desasignación incrementa `tenants.authorization_version`. El pull móvil compara esta versión: al cambiar, el servidor reinicia el cursor y Expo elimina de SQLite los clientes y obligaciones previamente autorizados antes de almacenar la nueva cartera. La outbox y los cobros locales se conservan para revisión; el servidor revalida permiso y cartera al recibir cada operación.
+
+Las zonas usan `collection_zones` y `customer_collection_zone_assignments`, también históricas. Son etiquetas operativas sin geolocalización ni ordenamiento de visitas. Los equipos usan `collection_teams` y `collection_team_members`; las altas y bajas de miembros son históricas.
+
+Las capacidades de administración son `customers.assign_collector`, `customers.unassign_collector`, `customers.view_assignments`, `collection_zones.view`, `collection_zones.manage`, `collection_teams.view`, `collection_teams.manage` y `collection_teams.manage_members`. Solo el backend aplica estas decisiones y registra auditoría.

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\Collections\CashSettlementService;
+use App\Domain\Collections\CollectionAssignmentService;
 use App\Domain\Collections\PaymentService;
 use App\Domain\Tenancy\AuthorizationManagementService;
 use App\Domain\Tenancy\AuthorizationService;
@@ -94,6 +95,7 @@ class CollectionsStageFiveTest extends TestCase
         $collector = $this->member('collector', $owner->tenant);
         $customer = $this->customer($owner);
         $this->obligation($owner, $customer, '10.00');
+        app(CollectionAssignmentService::class)->assign($owner->tenant, $owner->user, $customer, $collector);
         $payment = app(PaymentService::class)->registerCash($owner->tenant, $collector->user, ['customer_id' => $customer->id, 'amount' => '10.00']);
         $settlements = app(CashSettlementService::class);
         $settlement = $settlements->create($owner->tenant, $collector->user, [['payment_id' => $payment->id, 'amount' => '10.00']]);

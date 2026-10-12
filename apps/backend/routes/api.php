@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\ApiContextController;
 use App\Http\Controllers\CashSettlementApiController;
+use App\Http\Controllers\CollectionPortfolioApiController;
+use App\Http\Controllers\CollectionStructureApiController;
 use App\Http\Controllers\CommercialApiController;
 use App\Http\Controllers\MobileAuthApiController;
 use App\Http\Controllers\MobileDeviceApiController;
@@ -23,6 +25,15 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::middleware('tenant.api')->group(function (): void {
         Route::post('/mobile-devices', [MobileDeviceApiController::class, 'register']);
         Route::get('/customers', [CommercialApiController::class, 'customers']);
+        Route::get('/collection-portfolio', [CollectionPortfolioApiController::class, 'index']);
+        Route::post('/customers/{customer}/collector-assignment', [CollectionPortfolioApiController::class, 'assign']);
+        Route::delete('/customers/{customer}/collector-assignment', [CollectionPortfolioApiController::class, 'unassign']);
+        Route::get('/collection-zones', [CollectionStructureApiController::class, 'zones']);
+        Route::post('/collection-zones', [CollectionStructureApiController::class, 'storeZone']);
+        Route::post('/customers/{customer}/collection-zone', [CollectionStructureApiController::class, 'assignZone']);
+        Route::get('/collection-teams', [CollectionStructureApiController::class, 'teams']);
+        Route::post('/collection-teams', [CollectionStructureApiController::class, 'storeTeam']);
+        Route::post('/collection-teams/{team}/members', [CollectionStructureApiController::class, 'addTeamMember']);
         Route::get('/customers/{customer}', [CommercialApiController::class, 'customer']);
         Route::get('/customers/{customer}/addresses', [CommercialApiController::class, 'addresses']);
         Route::get('/products', [CommercialApiController::class, 'products']);

@@ -30,3 +30,12 @@ export type SyncOperation = {
   };
   recorded_at: string;
 };
+
+export type CollectionPortfolioPull = {
+  customers: Array<{ id: string; customer_number: string; first_name: string; last_name: string; status: string; updated_at: string }>;
+  obligations: Array<{ id: string; customer_id: string; outstanding_amount: string; due_date: string | null; entry_type: string }>;
+  cursor: number;
+  has_more: boolean;
+  reset: boolean;
+  portfolio_version: number;
+};

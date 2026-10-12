@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Collections\CollectionPortfolioService;
 use App\Domain\Collections\PaymentService;
 use App\Domain\Tenancy\AuthorizationService;
 use App\Models\Payment;
@@ -10,7 +11,7 @@ use Illuminate\Http\Request;
 
 class PaymentApiController extends Controller
 {
-    public function index(Request $request, AuthorizationService $authorization): JsonResponse
+    public function index(Request $request, AuthorizationService $authorization, CollectionPortfolioService $portfolio): JsonResponse
     {
         $membership = $request->attributes->get('activeMembership');
         abort_unless($authorization->allows($membership, 'payments.view'), 403);
@@ -18,18 +19,23 @@ class PaymentApiController extends Controller
         $query = Payment::forTenant($membership->tenant_id)->orderByDesc('received_at');
         if ($decision['scope'] === 'own') {
             $query->where('received_by_user_id', $request->user()->id);
+        } elseif (in_array($decision['scope'], ['assigned', 'team'], true)) {
+            $query->whereIn('customer_id', $portfolio->customers($request->attributes->get('activeTenant'), $membership, 'payments.view')->select('customers.id'));
         }
         $rows = $query->paginate(30);
 
         return response()->json(['data' => $rows->items(), 'meta' => ['current_page' => $rows->currentPage(), 'last_page' => $rows->lastPage()]]);
     }
 
-    public function show(Request $request, Payment $payment, AuthorizationService $authorization): JsonResponse
+    public function show(Request $request, Payment $payment, AuthorizationService $authorization, CollectionPortfolioService $portfolio): JsonResponse
     {
         $membership = $request->attributes->get('activeMembership');
         abort_unless($payment->tenant_id === $membership->tenant_id && $authorization->allows($membership, 'payments.view'), 404);
         $decision = $authorization->decision($membership, 'payments.view');
         abort_unless($decision['scope'] !== 'own' || $payment->received_by_user_id === $request->user()->id, 403);
+        if (in_array($decision['scope'], ['assigned', 'team'], true)) {
+            abort_unless($portfolio->customers($request->attributes->get('activeTenant'), $membership, 'payments.view')->whereKey($payment->customer_id)->exists(), 403);
+        }
 
         return response()->json(['data' => $payment->only(['id', 'customer_id', 'method', 'source', 'status', 'amount', 'unallocated_amount', 'received_at', 'confirmed_at', 'reference', 'notes'])]);
     }

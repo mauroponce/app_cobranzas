@@ -23,3 +23,9 @@ Con token Sanctum y empresa seleccionada mediante `POST /api/v1/tenant/select`:
 - `GET /api/v1/quotations` y `GET /api/v1/quotations/{id}`; un vendedor solo ve los propios.
 
 Las colecciones responden con `data` y `meta.current_page`/`meta.last_page`. Los importes se representan como cadenas decimales, sin números de punto flotante. La API comercial de esta etapa es de lectura; las escrituras permanecen en el panel Laravel hasta definir contratos móviles de sincronización y conflictos.
+
+## Carteras de cobranza (etapa 6)
+
+`GET /api/v1/collection-portfolio` consulta la cartera efectiva. La administración usa `POST` y `DELETE` sobre `/customers/{id}/collector-assignment`, y los recursos `/collection-zones` y `/collection-teams`. Todos requieren empresa seleccionada y verifican capacidades en servidor.
+
+`GET /api/v1/sync/pull?cursor=&portfolio_version=` devuelve solo clientes cobrables autorizados. Si cambia la cartera, responde `reset: true`, reinicia el cursor y entrega `portfolio_version`; el cliente debe eliminar la caché autorizada anterior antes de almacenar la página recibida. Las operaciones de salida no se eliminan por esa invalidación.

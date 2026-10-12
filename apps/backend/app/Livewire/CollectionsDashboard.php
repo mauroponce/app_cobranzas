@@ -2,9 +2,9 @@
 
 namespace App\Livewire;
 
+use App\Domain\Collections\CollectionPortfolioService;
 use App\Domain\Collections\PaymentService;
 use App\Domain\Tenancy\AuthorizationService;
-use App\Models\Customer;
 use App\Models\Payment;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
@@ -40,15 +40,18 @@ class CollectionsDashboard extends Component
         $payments->confirmTransfer(request()->attributes->get('activeTenant'), auth()->user(), Payment::findOrFail($paymentId));
     }
 
-    public function render(AuthorizationService $authorization): View
+    public function render(AuthorizationService $authorization, CollectionPortfolioService $portfolio): View
     {
         $membership = request()->attributes->get('activeMembership');
         Gate::authorize('payments.view');
         $payments = Payment::forTenant($membership->tenant_id)->latest('received_at');
-        if ($authorization->decision($membership, 'payments.view')['scope'] === 'own') {
+        $paymentScope = $authorization->decision($membership, 'payments.view')['scope'];
+        if ($paymentScope === 'own') {
             $payments->where('received_by_user_id', auth()->id());
+        } elseif (in_array($paymentScope, ['assigned', 'team'], true)) {
+            $payments->whereIn('customer_id', $portfolio->customers($membership->tenant, $membership, 'payments.view')->select('customers.id'));
         }
 
-        return view('livewire.collections-dashboard', ['payments' => $payments->paginate(20), 'customers' => Customer::forTenant($membership->tenant_id)->where('status', 'active')->orderBy('last_name')->get(['id', 'first_name', 'last_name'])]);
+        return view('livewire.collections-dashboard', ['payments' => $payments->paginate(20), 'customers' => $portfolio->customers($membership->tenant, $membership)->where('status', 'active')->orderBy('last_name')->get(['id', 'first_name', 'last_name'])]);
     }
 }

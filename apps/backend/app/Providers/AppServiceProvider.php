@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Domain\Tenancy\RoleMatrix;
 use App\Domain\Tenancy\TenantAuthorization;
+use App\Http\Middleware\ResolveAdminTenant;
 use App\Models\Customer;
 use App\Models\CustomerDocument;
 use App\Models\Product;
@@ -19,6 +20,7 @@ use App\Policies\SaleApplicationPolicy;
 use App\Policies\SalePolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -35,6 +37,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Livewire::addPersistentMiddleware([ResolveAdminTenant::class]);
         Gate::policy(Customer::class, CustomerPolicy::class);
         Gate::policy(Product::class, ProductPolicy::class);
         Gate::policy(Quotation::class, QuotationPolicy::class);

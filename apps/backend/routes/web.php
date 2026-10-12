@@ -39,6 +39,8 @@ Route::middleware('auth')->group(function (): void {
     Route::middleware('tenant.admin')->group(function (): void {
         Route::view('/dashboard', 'dashboard')->name('dashboard');
         Route::view('/admin/collections', 'collections.index')->name('collections.index');
+        Route::view('/admin/collections/portfolios', 'collections.portfolios')->name('collections.portfolios');
+        Route::view('/admin/collections/structures', 'collections.structures')->name('collections.structures');
         Route::view('/admin/authorization', 'authorization.index')->name('authorization.index');
         Route::get('/admin/users', [TenantUserController::class, 'index'])->name('admin.users');
         Route::get('/admin/users/{membership}', [TenantUserController::class, 'show'])->name('admin.users.show');

@@ -12,6 +12,17 @@ final class TenantAuthorization
     {
         $membership = $request->attributes->get('activeMembership');
 
+        if (! $membership instanceof TenantMembership) {
+            $activeTenantId = $request->hasSession() ? $request->session()->get('active_tenant_id') : null;
+            if ($activeTenantId) {
+                $membership = TenantMembership::query()->with('tenant')->where('tenant_id', $activeTenantId)->where('user_id', $user->id)->where('status', 'active')->first();
+                if ($membership?->tenant?->status === 'active') {
+                    $request->attributes->set('activeTenant', $membership->tenant);
+                    $request->attributes->set('activeMembership', $membership);
+                }
+            }
+        }
+
         return $membership instanceof TenantMembership && $membership->user_id === $user->id
             && $membership->status === 'active' && $membership->tenant?->status === 'active'
             ? $membership : null;

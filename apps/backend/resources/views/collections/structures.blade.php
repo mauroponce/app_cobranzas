@@ -1,0 +1,1 @@
+<x-layouts.app title="Zonas y equipos"><div class="mb-6"><h1 class="admin-title">Zonas y equipos de cobranza</h1><p class="admin-muted mt-1">Organizá la cartera sin rutas ni geolocalización.</p></div><livewire:collection-structures-manager /></x-layouts.app>

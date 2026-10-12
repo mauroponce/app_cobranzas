@@ -8,6 +8,24 @@ export function initializeDatabase(): Promise<SQLite.SQLiteDatabase> {
       await database.execAsync(
         'CREATE TABLE IF NOT EXISTS app_metadata (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)',
       );
+      await database.execAsync(`CREATE TABLE IF NOT EXISTS offline_outbox (
+        operation_id TEXT PRIMARY KEY NOT NULL, tenant_id TEXT NOT NULL, user_id TEXT NOT NULL,
+        device_id TEXT NOT NULL, type TEXT NOT NULL, payload TEXT NOT NULL, recorded_at TEXT NOT NULL,
+        status TEXT NOT NULL, attempt_count INTEGER NOT NULL DEFAULT 0, last_error TEXT, synced_at TEXT
+      )`);
+      try { await database.execAsync('ALTER TABLE offline_outbox ADD COLUMN next_attempt_at TEXT'); } catch {}
+      await database.execAsync(`CREATE TABLE IF NOT EXISTS authorized_obligations (
+        scope_key TEXT NOT NULL, id TEXT NOT NULL, customer_id TEXT NOT NULL, outstanding_amount TEXT NOT NULL,
+        due_date TEXT, PRIMARY KEY (scope_key, id)
+      )`);
+      await database.execAsync(`CREATE TABLE IF NOT EXISTS authorized_customers (
+        scope_key TEXT NOT NULL, id TEXT NOT NULL, name TEXT NOT NULL, status TEXT NOT NULL, updated_at TEXT,
+        PRIMARY KEY (scope_key, id)
+      )`);
+      await database.execAsync(`CREATE TABLE IF NOT EXISTS local_payments (
+        operation_id TEXT PRIMARY KEY NOT NULL, scope_key TEXT NOT NULL, customer_id TEXT NOT NULL,
+        amount TEXT NOT NULL, status TEXT NOT NULL, payment_id TEXT, recorded_at TEXT NOT NULL, result TEXT
+      )`);
       return database;
     })
     .catch((error: unknown) => {

@@ -1,0 +1,1 @@
+<x-layouts.app title="Cobranzas"><div class="mb-6"><h1 class="admin-title">Cobranzas</h1><p class="admin-muted mt-1">Registrá efectivo y declará transferencias para su verificación.</p></div><livewire:collections-dashboard /></x-layouts.app>

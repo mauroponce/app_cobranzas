@@ -5,12 +5,18 @@ namespace App\Providers;
 use App\Domain\Tenancy\RoleMatrix;
 use App\Domain\Tenancy\TenantAuthorization;
 use App\Models\Customer;
+use App\Models\CustomerDocument;
 use App\Models\Product;
 use App\Models\Quotation;
+use App\Models\Sale;
+use App\Models\SaleApplication;
 use App\Models\User;
+use App\Policies\CustomerDocumentPolicy;
 use App\Policies\CustomerPolicy;
 use App\Policies\ProductPolicy;
 use App\Policies\QuotationPolicy;
+use App\Policies\SaleApplicationPolicy;
+use App\Policies\SalePolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -32,6 +38,9 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Customer::class, CustomerPolicy::class);
         Gate::policy(Product::class, ProductPolicy::class);
         Gate::policy(Quotation::class, QuotationPolicy::class);
+        Gate::policy(Sale::class, SalePolicy::class);
+        Gate::policy(SaleApplication::class, SaleApplicationPolicy::class);
+        Gate::policy(CustomerDocument::class, CustomerDocumentPolicy::class);
 
         foreach (RoleMatrix::CAPABILITIES as $capability) {
             Gate::define($capability, fn (User $user) => TenantAuthorization::allows(request(), $user, $capability));

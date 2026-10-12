@@ -26,7 +26,12 @@
             @can('customers.view')<x-ui.nav-link icon="users" label="Clientes" :href="route('customers.index')" :active="request()->routeIs('customers.*')" />@endcan
             @can('products.view')<x-ui.nav-link icon="bag" label="Productos" :href="route('products.index')" :active="request()->routeIs('products.*')" />@endcan
             @can('quotations.view')<x-ui.nav-link icon="receipt" label="Presupuestos" :href="route('quotations.index')" :active="request()->routeIs('quotations.*')" />@endcan
-            @foreach (['sales' => ['Ventas','bag'], 'collections' => ['Cobranzas','wallet'], 'routes' => ['Rutas y visitas','route'], 'collectors' => ['Cobradores','user-cog'], 'settlements' => ['Rendiciones','receipt']] as $section => [$label, $icon])
+            @can('sales.view')<x-ui.nav-link icon="receipt" label="Solicitudes de venta" :href="route('sale-applications.index')" :active="request()->routeIs('sale-applications.*')" />@endcan
+            @can('sales.view')<x-ui.nav-link icon="bag" label="Ventas" :href="route('sales.index')" :active="request()->routeIs('sales.*')" />@endcan
+            @can('sales.view')<x-ui.nav-link icon="chart" label="Políticas de mora" :href="route('late-fee-policies.index')" :active="request()->routeIs('late-fee-policies.*')" />@endcan
+            @can('payments.view')<x-ui.nav-link icon="wallet" label="Cobranzas" :href="route('collections.index')" :active="request()->routeIs('collections.*')" />@endcan
+            @can('authorization.view')<x-ui.nav-link icon="user-cog" label="Permisos y módulos" :href="route('authorization.index')" :active="request()->routeIs('authorization.*')" />@endcan
+            @foreach (['routes' => ['Rutas y visitas','route'], 'collectors' => ['Cobradores','user-cog']] as $section => [$label, $icon])
                 @can(match($section) {'sales' => 'sales.view', 'collections' => 'collections.view', 'routes' => 'routes.view', 'collectors' => 'routes.view', 'settlements' => 'settlements.view'})<x-ui.nav-link :icon="$icon" :label="$label" :href="route('modules.show', $section)" :active="request()->route('section') === $section" />@endcan
             @endforeach
             <p class="admin-nav-caption">ADMINISTRACIÓN</p>

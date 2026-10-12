@@ -20,20 +20,25 @@ final class AuthorizationService
             return ['allowed' => in_array($capability, RoleMatrix::permissions($membership->role), true), 'scope' => 'all'];
         }
         $feature = TenantFeature::query()->where('tenant_id', $membership->tenant_id)->where('feature_id', $permission->feature_id)->first();
-        if (! $permission->feature?->is_active || ! $feature?->is_enabled) {
+        if (! $permission->feature?->is_active || ! $feature?->is_available || ! $feature->is_enabled) {
             return ['allowed' => false, 'scope' => null];
         }
         $override = MembershipPermissionOverride::query()->where('tenant_id', $membership->tenant_id)->where('membership_id', $membership->id)->where('permission_id', $permission->id)->first();
         if ($override) {
-            return ['allowed' => $override->effect === 'allow', 'scope' => $override->effect === 'allow' ? $override->scope : null];
+            return ['allowed' => $override->effect === 'allow', 'scope' => $override->effect === 'allow' ? $this->validScope($permission, $override->scope) : null];
         }
         $role = RolePermission::query()->where('role', $membership->role)->where('permission_id', $permission->id)->first();
 
-        return ['allowed' => $role !== null, 'scope' => $role?->scope];
+        return ['allowed' => $role !== null && $this->validScope($permission, $role?->scope) !== null, 'scope' => $this->validScope($permission, $role?->scope)];
     }
 
     public function allows(TenantMembership $membership, string $capability): bool
     {
         return $this->decision($membership, $capability)['allowed'];
+    }
+
+    private function validScope(Permission $permission, ?string $scope): ?string
+    {
+        return $scope !== null && in_array($scope, $permission->allowed_scopes ?: ['all'], true) ? $scope : null;
     }
 }

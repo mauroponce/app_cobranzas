@@ -1,82 +1,21 @@
+import { useCallback, useEffect, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
-import { useNavigation, type NavigationProp } from '@react-navigation/native';
-import { Button } from 'react-native-paper';
+import { useFocusEffect } from '@react-navigation/native';
+import { Button, Text } from 'react-native-paper';
+import { useAuth } from '../../auth/AuthContext';
 import { AppHeader } from '../../components/AppHeader';
-import { BalanceCard } from '../../components/BalanceCard';
 import { EmptyState } from '../../components/EmptyState';
-import { MetricCard } from '../../components/MetricCard';
-import { PaymentCard } from '../../components/PaymentCard';
 import { ListScreen } from '../../components/Screen';
 import { SectionTitle } from '../../components/SectionTitle';
-import { SyncStatusBanner } from '../../components/SyncStatusBanner';
-import { collectorData } from '../../data/collectorData';
+import { SurfaceCard } from '../../components/SurfaceCard';
+import { payments, pendingCount, scopeKey, syncInfo, type LocalPayment } from '../../database/financial';
+import { syncNow } from '../../sync/worker';
 import { spacing } from '../../theme/theme';
-import type { RootStackParamList } from '../../types/navigation';
+
 export function CollectionsScreen() {
-  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  return (
-    <ListScreen>
-      <FlatList
-        data={collectorData.payments}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        ListHeaderComponent={
-          <View style={styles.header}>
-            <AppHeader
-              eyebrow="Movimientos"
-              title="Mis cobranzas"
-              subtitle="Historial y efectivo pendiente"
-              onNotifications={() => navigation.navigate('Notifications')}
-            />
-            <BalanceCard
-              label="Total cobrado"
-              amount="—"
-              footer="Sin operaciones registradas"
-              icon="cash-multiple"
-            />
-            <View style={styles.row}>
-              <MetricCard icon="check-circle-outline" value="—" label="Confirmadas" />
-              <MetricCard icon="cloud-upload-outline" value="—" label="Locales pendientes" />
-            </View>
-            <View style={styles.row}>
-              <MetricCard icon="alert-circle-outline" value="—" label="Conflictos" />
-              <MetricCard icon="receipt-text-outline" value="—" label="Operaciones" />
-            </View>
-            <SyncStatusBanner state="unknown" />
-            <SectionTitle title="Movimientos recientes" />
-          </View>
-        }
-        renderItem={({ item }) => <PaymentCard payment={item} />}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        ListEmptyComponent={
-          <EmptyState
-            icon="wallet-outline"
-            title="Sin movimientos"
-            description="Los cobros confirmados, locales pendientes y conflictos aparecerán aquí cuando se habilite el registro de operaciones."
-          />
-        }
-        ListFooterComponent={
-          <Button
-            mode="outlined"
-            style={styles.footer}
-            onPress={() => navigation.navigate('Settlement')}
-          >
-            Ver rendición de efectivo
-          </Button>
-        }
-      />
-    </ListScreen>
-  );
+  const { state } = useAuth(); const [rows, setRows] = useState<LocalPayment[]>([]); const [pending, setPending] = useState(0); const [syncing, setSyncing] = useState(false); const [lastSuccess, setLastSuccess] = useState<string | null>(null); const [lastError, setLastError] = useState<string | null>(null);
+  const load = useCallback(() => { if (state) { const scope = scopeKey(state.capabilities.tenant.id, state.capabilities.user.id); payments(scope).then(setRows); pendingCount(scope).then(setPending); syncInfo(scope).then((info) => { setLastSuccess(info.lastSuccess); setLastError(info.lastError); }); } }, [state]); useEffect(load, [load]); useFocusEffect(load);
+  const sync = async () => { if (!state) return; setSyncing(true); try { await syncNow({ token: state.token, deviceId: state.deviceId, tenantId: state.capabilities.tenant.id, userId: state.capabilities.user.id }, { force: true }); } finally { setSyncing(false); load(); } };
+  return <ListScreen><FlatList data={rows} keyExtractor={(item) => item.operation_id} contentContainerStyle={styles.list} ListHeaderComponent={<View style={styles.header}><AppHeader eyebrow="Movimientos locales y confirmados" title="Mis cobros" /><SurfaceCard><Text variant="titleMedium">{pending} pendientes de sincronización</Text><Text variant="bodySmall">{lastSuccess ? `Última sincronización: ${new Date(lastSuccess).toLocaleString('es-AR')}` : 'Todavía no hay una sincronización exitosa.'}</Text>{lastError ? <Text variant="bodySmall">Último error: {lastError}</Text> : null}<Button mode="outlined" loading={syncing} onPress={sync}>Sincronizar ahora</Button></SurfaceCard><SectionTitle title="Historial" /></View>} renderItem={({ item }) => <SurfaceCard><Text variant="titleMedium">$ {item.amount}</Text><Text>{item.status === 'confirmed' ? 'Confirmado por servidor' : item.status === 'under_review' ? 'En revisión' : item.status === 'rejected' ? 'Rechazado' : 'Pendiente de sincronización'}</Text><Text variant="bodySmall">{item.recorded_at} · operación {item.operation_id}</Text></SurfaceCard>} ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />} ListEmptyComponent={<EmptyState icon="wallet-outline" title="Sin cobros" description="Los cobros locales aparecerán aquí inmediatamente." />} /></ListScreen>;
 }
-const styles = StyleSheet.create({
-  list: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.section,
-    flexGrow: 1,
-  },
-  header: { gap: spacing.lg, marginBottom: spacing.md },
-  row: { flexDirection: 'row', gap: spacing.sm },
-  separator: { height: spacing.md },
-  footer: { marginTop: spacing.lg },
-});
+const styles = StyleSheet.create({ list: { padding: spacing.xl, flexGrow: 1 }, header: { gap: spacing.md, marginBottom: spacing.md } });

@@ -10,11 +10,19 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class TenancyAndAuthTest extends TestCase
 {
     use RefreshDatabase;
+
+    private function csrfPost(string $uri, array $data)
+    {
+        $token = Str::random(40);
+
+        return $this->withSession(['_token' => $token])->post($uri, $data + ['_token' => $token]);
+    }
 
     private function adminMembership(User $user, string $slug = 'company-one', string $role = 'admin'): TenantMembership
     {
@@ -28,7 +36,7 @@ class TenancyAndAuthTest extends TestCase
         $user = User::factory()->create(['password' => 'very-secure-password']);
         $membership = $this->adminMembership($user);
 
-        $this->post('/login', ['email' => $user->email, 'password' => 'very-secure-password'])
+        $this->csrfPost('/login', ['email' => $user->email, 'password' => 'very-secure-password'])
             ->assertRedirect('/dashboard');
         $this->assertAuthenticatedAs($user);
         $this->get('/dashboard')->assertOk()->assertSee('App Cobranzas');
@@ -43,8 +51,8 @@ class TenancyAndAuthTest extends TestCase
         $foreign = Tenant::create(['name' => 'Foreign', 'slug' => 'foreign']);
 
         $this->actingAs($user)->get('/dashboard')->assertRedirect('/tenants/choose');
-        $this->post('/tenants/choose', ['tenant_id' => $foreign->id])->assertNotFound();
-        $this->post('/tenants/choose', ['tenant_id' => $first->tenant_id])->assertRedirect('/dashboard');
+        $this->csrfPost('/tenants/choose', ['tenant_id' => $foreign->id])->assertNotFound();
+        $this->csrfPost('/tenants/choose', ['tenant_id' => $first->tenant_id])->assertRedirect('/dashboard');
         $this->get('/dashboard')->assertOk()->assertSee('company-one');
     }
 
@@ -83,12 +91,12 @@ class TenancyAndAuthTest extends TestCase
     {
         Notification::fake();
         $user = User::factory()->create();
-        $this->post('/forgot-password', ['email' => $user->email])->assertSessionHas('status');
+        $this->csrfPost('/forgot-password', ['email' => $user->email])->assertSessionHas('status');
         Notification::assertSentTo($user, ResetPassword::class);
-        $this->post('/forgot-password', ['email' => 'unknown@example.com'])->assertSessionHas('status');
+        $this->csrfPost('/forgot-password', ['email' => 'unknown@example.com'])->assertSessionHas('status');
 
         $token = Password::createToken($user);
-        $this->post('/reset-password', [
+        $this->csrfPost('/reset-password', [
             'token' => $token,
             'email' => $user->email,
             'password' => 'new-secure-password',

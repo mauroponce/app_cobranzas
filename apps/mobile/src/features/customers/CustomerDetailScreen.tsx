@@ -1,91 +1,18 @@
-import { Linking, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button, Text } from 'react-native-paper';
+import { useAuth } from '../../auth/AuthContext';
 import { AppHeader } from '../../components/AppHeader';
 import { EmptyState } from '../../components/EmptyState';
 import { Screen } from '../../components/Screen';
-import { SectionTitle } from '../../components/SectionTitle';
 import { SurfaceCard } from '../../components/SurfaceCard';
-import { collectorData, formatMoney } from '../../data/collectorData';
-import { spacing } from '../../theme/theme';
+import { customers, obligations, scopeKey, type LocalCustomer, type LocalObligation } from '../../database/financial';
 import type { RootStackParamList } from '../../types/navigation';
 type Props = NativeStackScreenProps<RootStackParamList, 'CustomerDetail'>;
 export function CustomerDetailScreen({ navigation, route }: Props) {
-  const customer = collectorData.customers.find((item) => item.id === route.params.customerId);
-  if (!customer)
-    return (
-      <Screen>
-        <AppHeader title="Detalle del cliente" onBack={navigation.goBack} />
-        <EmptyState
-          icon="account-off-outline"
-          title="Cliente no disponible"
-          description="No hay una ficha de cliente cargada en este dispositivo."
-        />
-      </Screen>
-    );
-  return (
-    <Screen>
-      <AppHeader
-        eyebrow="Ficha de cobranza"
-        title={customer.name}
-        subtitle={customer.address}
-        onBack={navigation.goBack}
-      />
-      <SurfaceCard>
-        <Text variant="labelMedium">Saldo exigible</Text>
-        <Text variant="headlineMedium" style={styles.bold}>
-          {formatMoney(customer.dueMinor)}
-        </Text>
-      </SurfaceCard>
-      <SectionTitle title="Información" />
-      <SurfaceCard>
-        <View style={styles.details}>
-          <Text>Teléfono: {customer.phone ?? 'Sin registrar'}</Text>
-          <Text>Dirección: {customer.address}</Text>
-          <Text>Cobrador habitual: {customer.collectorName ?? 'Sin asignar'}</Text>
-          <Text>Ventas activas: {customer.activeSales ?? '—'}</Text>
-          <Text>Cuotas pendientes: {customer.pendingInstallments ?? '—'}</Text>
-        </View>
-      </SurfaceCard>
-      <View style={styles.actions}>
-        <Button
-          mode="outlined"
-          icon="phone"
-          disabled={!customer.phone}
-          onPress={() => customer.phone && Linking.openURL(`tel:${customer.phone}`)}
-        >
-          Llamar
-        </Button>
-        <Button
-          mode="outlined"
-          icon="map-marker"
-          onPress={() =>
-            Linking.openURL(
-              `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(customer.address)}`,
-            )
-          }
-        >
-          Mapa
-        </Button>
-      </View>
-      <Button
-        mode="contained"
-        icon="cash"
-        onPress={() => navigation.navigate('RegisterPayment', { customerId: customer.id })}
-      >
-        Registrar cobro
-      </Button>
-      <SectionTitle title="Ventas y pagos" />
-      <EmptyState
-        icon="receipt-text-outline"
-        title="Sin historial disponible"
-        description="Cada venta tendrá su propio plan de cuotas cuando el servidor publique estos datos."
-      />
-    </Screen>
-  );
+  const { state } = useAuth(); const [customer, setCustomer] = useState<LocalCustomer>(); const [entries, setEntries] = useState<LocalObligation[]>([]);
+  const load = useCallback(() => { if (!state) return; const scope = scopeKey(state.capabilities.tenant.id, state.capabilities.user.id); customers(scope).then((rows) => setCustomer(rows.find((row) => row.id === route.params.customerId))); obligations(scope, route.params.customerId).then(setEntries); }, [route.params.customerId, state]); useEffect(load, [load]); useFocusEffect(load);
+  if (!customer) return <Screen><AppHeader title="Detalle" onBack={navigation.goBack} /><EmptyState icon="account-off-outline" title="Cliente no disponible" description="Sincronizá para recuperar esta ficha." /></Screen>;
+  return <Screen><AppHeader eyebrow="Saldo confirmado" title={customer.name} onBack={navigation.goBack} /><SurfaceCard><Text variant="labelMedium">Obligaciones pendientes</Text><Text variant="headlineSmall">{entries.length ? `$ ${entries.map((entry) => entry.outstanding_amount).join(' + ')}` : '—'}</Text></SurfaceCard>{entries.map((entry) => <SurfaceCard key={entry.id}><Text>{entry.entry_type} · vence {entry.due_date ?? 'sin fecha'}</Text><Text variant="titleMedium">$ {entry.outstanding_amount}</Text></SurfaceCard>)}{state?.capabilities.permissions['payments.create'] ? <Button mode="contained" icon="cash" onPress={() => navigation.navigate('RegisterPayment', { customerId: customer.id })}>Registrar cobro</Button> : null}</Screen>;
 }
-const styles = StyleSheet.create({
-  bold: { fontWeight: '800' },
-  details: { gap: spacing.md },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-});

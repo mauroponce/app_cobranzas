@@ -1,4 +1,6 @@
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
+import * as Network from 'expo-network';
 import {
   NavigationContainer,
   DarkTheme as NavigationDarkTheme,
@@ -12,7 +14,6 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { StatusBar } from 'expo-status-bar';
 import { initializeDatabase } from './src/database/database';
 import { WelcomeScreen } from './src/app/WelcomeScreen';
-import { RoutesScreen } from './src/features/routes/RoutesScreen';
 import { CustomersScreen } from './src/features/customers/CustomersScreen';
 import { CustomerDetailScreen } from './src/features/customers/CustomerDetailScreen';
 import { CollectionsScreen } from './src/features/collections/CollectionsScreen';
@@ -23,12 +24,16 @@ import { VisitOutcomeScreen } from './src/features/visits/VisitOutcomeScreen';
 import { NotificationsScreen } from './src/features/notifications/NotificationsScreen';
 import { SettingsScreen } from './src/features/settings/SettingsScreen';
 import { AppearanceProvider, useAppearance } from './src/theme/AppearanceContext';
+import { AuthProvider, useAuth } from './src/auth/AuthContext';
+import { LoginScreen } from './src/auth/LoginScreen';
+import { syncNow } from './src/sync/worker';
 import type { RootStackParamList, TabParamList } from './src/types/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tabs = createBottomTabNavigator<TabParamList>();
 
 function MainTabs() {
+  const { state } = useAuth();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   return (
@@ -67,18 +72,28 @@ function MainTabs() {
       })}
     >
       <Tabs.Screen name="Home" component={WelcomeScreen} options={{ title: 'Inicio' }} />
-      <Tabs.Screen name="Route" component={RoutesScreen} options={{ title: 'Ruta' }} />
-      <Tabs.Screen name="Customers" component={CustomersScreen} options={{ title: 'Clientes' }} />
-      <Tabs.Screen name="Collections" component={CollectionsScreen} options={{ title: 'Cobros' }} />
+      {state?.capabilities.permissions['customers.view'] ? <Tabs.Screen name="Customers" component={CustomersScreen} options={{ title: 'Clientes' }} /> : null}
+      {state?.capabilities.permissions['payments.view'] ? <Tabs.Screen name="Collections" component={CollectionsScreen} options={{ title: 'Cobros' }} /> : null}
       <Tabs.Screen name="Profile" component={SettingsScreen} options={{ title: 'Perfil' }} />
     </Tabs.Navigator>
   );
 }
 
 function AppNavigation() {
+  const { state, ready } = useAuth();
   const { isDark } = useAppearance();
   const theme = useTheme();
   const navTheme = isDark ? NavigationDarkTheme : NavigationLightTheme;
+  useEffect(() => {
+    if (!state) return undefined;
+    const run = () => syncNow({ token: state.token, deviceId: state.deviceId, tenantId: state.capabilities.tenant.id, userId: state.capabilities.user.id }).catch(() => {});
+    run();
+    const network = Network.addNetworkStateListener((event) => { if (event.isConnected && event.isInternetReachable !== false) run(); });
+    const appState = AppState.addEventListener('change', (next) => { if (next === 'active') run(); });
+    return () => { network.remove(); appState.remove(); };
+  }, [state]);
+  if (!ready) return null;
+  if (!state) return <LoginScreen />;
   return (
     <NavigationContainer
       theme={{
@@ -115,7 +130,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AppearanceProvider>
-        <AppNavigation />
+        <AuthProvider><AppNavigation /></AuthProvider>
       </AppearanceProvider>
     </SafeAreaProvider>
   );

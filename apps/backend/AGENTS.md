@@ -15,3 +15,7 @@ La matriz ejecutable está en `app/Domain/Tenancy/RoleMatrix.php`; agregá allí
 ## Etapa 3: módulo comercial
 
 Los modelos de `customers`, `products` y `quotations` están documentados en `docs/architecture/`. Usá `CustomerService`, `PriceService`, `QuotationService`, `Decimal` y `CommercialNumber` para sus reglas. Las Policies protegen recursos y la matriz `RoleMatrix` protege capacidades. Los controladores y componentes Livewire vuelven a resolver el tenant; la API usa `tenant.api` con el contexto ligado a Sanctum. Un precio nuevo requiere vigencia sin solapamiento; un presupuesto aprobado se duplica para revisarlo. No agregues cálculo de cuota sin política aprobada. Ejecutá la suite sobre PostgreSQL.
+
+## Etapa 4: ventas
+
+El flujo está documentado en `docs/architecture/sales.md`. Usá `SaleApplicationService`, `ConfirmSaleAction`, `CancelSaleAction`, `InstallmentSchedule`, `AccountStatementService` y `DocumentStorageService`; no escribas ventas o cuotas directamente desde controladores. Los importes de cuotas y mora usan centavos enteros y puntos básicos enteros. `sales.view_all` controla visibilidad global dentro de la empresa; `sales.approve`, `sales.confirm`, `sales.cancel`, `sales.documents.verify` y `sales.policies.manage` son capacidades separadas. Los documentos se descargan a través de rutas autorizadas; nunca exponer una URL pública permanente de R2. Para pruebas de almacenamiento, `Storage::fake('r2')`.

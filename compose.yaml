@@ -27,6 +27,13 @@ x-php: &php
     MAIL_MAILER: smtp
     MAIL_HOST: mailpit
     MAIL_PORT: 1025
+    RESEND_API_KEY: ${RESEND_API_KEY:-}
+    MAIL_FROM_ADDRESS: ${RESEND_FROM:-${MAIL_FROM:-}}
+    MAIL_FROM_NAME: ${APP_NAME:-App Cobranzas}
+    R2_ACCESS_KEY_ID: ${CLOUDFLARE_ACCESS_KEY_ID:-}
+    R2_SECRET_ACCESS_KEY: ${CLOUDFLARE_SECRET_ACCESS_KEY:-}
+    R2_BUCKET: ${CLOUDFLARE_R2_BUCKET:-${R2_BUCKET:-}}
+    R2_ENDPOINT: ${CLOUDFLARE_R2_ENDPOINT:-}
   volumes:
     - ./apps/backend:/var/www/html
     - backend_vendor:/var/www/html/vendor

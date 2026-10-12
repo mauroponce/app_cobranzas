@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Quotation extends Model
 {
@@ -44,6 +45,11 @@ class Quotation extends Model
     public function activities(): HasMany
     {
         return $this->hasMany(QuotationActivity::class)->orderByDesc('occurred_at');
+    }
+
+    public function saleApplication(): HasOne
+    {
+        return $this->hasOne(SaleApplication::class);
     }
 
     protected function casts(): array

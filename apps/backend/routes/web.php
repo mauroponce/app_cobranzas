@@ -8,6 +8,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\PlatformTenantController;
 use App\Http\Controllers\QuotationController;
+use App\Http\Controllers\SaleController;
 use App\Http\Controllers\TenantInvitationController;
 use App\Http\Controllers\TenantSelectionController;
 use App\Http\Controllers\TenantUserController;
@@ -37,6 +38,8 @@ Route::middleware('auth')->group(function (): void {
 
     Route::middleware('tenant.admin')->group(function (): void {
         Route::view('/dashboard', 'dashboard')->name('dashboard');
+        Route::view('/admin/collections', 'collections.index')->name('collections.index');
+        Route::view('/admin/authorization', 'authorization.index')->name('authorization.index');
         Route::get('/admin/users', [TenantUserController::class, 'index'])->name('admin.users');
         Route::get('/admin/users/{membership}', [TenantUserController::class, 'show'])->name('admin.users.show');
         Route::patch('/admin/users/{membership}/role', [TenantUserController::class, 'updateRole'])->name('admin.users.role');
@@ -83,6 +86,28 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/admin/quotations/{quotation}/activities', [QuotationController::class, 'activity'])->name('quotations.activities.store');
         Route::get('/admin/quotations/{quotation}/print', [QuotationController::class, 'print'])->name('quotations.print');
         Route::get('/admin/quotations/{quotation}/pdf', [QuotationController::class, 'pdf'])->name('quotations.pdf');
+        Route::get('/admin/sale-applications', [SaleController::class, 'applications'])->name('sale-applications.index');
+        Route::get('/admin/sale-applications/direct', [SaleController::class, 'createDirect'])->name('sale-applications.direct');
+        Route::post('/admin/sale-applications/direct', [SaleController::class, 'storeDirect'])->name('sale-applications.direct.store');
+        Route::post('/admin/sale-applications/from-quotation/{quotation}', [SaleController::class, 'fromQuotation'])->name('sale-applications.from-quotation');
+        Route::get('/admin/sale-applications/{application}', [SaleController::class, 'application'])->name('sale-applications.show');
+        Route::patch('/admin/sale-applications/{application}/items', [SaleController::class, 'replaceDirectItems'])->name('sale-applications.items');
+        Route::patch('/admin/sale-applications/{application}/terms', [SaleController::class, 'updateTerms'])->name('sale-applications.terms');
+        Route::post('/admin/sale-applications/{application}/submit', [SaleController::class, 'submit'])->name('sale-applications.submit');
+        Route::post('/admin/sale-applications/{application}/assess', [SaleController::class, 'assess'])->name('sale-applications.assess');
+        Route::post('/admin/sale-applications/{application}/documents', [SaleController::class, 'uploadDocument'])->name('sale-applications.documents');
+        Route::patch('/admin/customer-documents/{document}/verify', [SaleController::class, 'verifyDocument'])->name('customer-documents.verify');
+        Route::get('/admin/customer-documents/{document}/download', [SaleController::class, 'document'])->name('customer-documents.download');
+        Route::post('/admin/sale-applications/{application}/confirm', [SaleController::class, 'confirm'])->name('sale-applications.confirm');
+        Route::get('/admin/sales', [SaleController::class, 'sales'])->name('sales.index');
+        Route::get('/admin/sales/{sale}', [SaleController::class, 'sale'])->name('sales.show');
+        Route::post('/admin/sales/{sale}/cancel', [SaleController::class, 'cancel'])->name('sales.cancel');
+        Route::get('/admin/sale-documents/{document}/download', [SaleController::class, 'saleDocument'])->name('sale-documents.download');
+        Route::get('/admin/customers/{customer}/account', [SaleController::class, 'account'])->name('customers.account');
+        Route::get('/admin/customers/{customer}/documents', [SaleController::class, 'customerDocuments'])->name('customers.documents');
+        Route::post('/admin/customers/{customer}/documents', [SaleController::class, 'uploadCustomerDocument'])->name('customers.documents.store');
+        Route::get('/admin/late-fee-policies', [SaleController::class, 'policies'])->name('late-fee-policies.index');
+        Route::post('/admin/late-fee-policies', [SaleController::class, 'storePolicy'])->name('late-fee-policies.store');
         Route::get('/modules/{section}', function (string $section) {
             $permissions = ['sales' => 'sales.view', 'collections' => 'collections.view', 'routes' => 'routes.view', 'collectors' => 'routes.view', 'settlements' => 'settlements.view', 'reports' => 'reports.view'];
             abort_unless(isset($permissions[$section]), 404);

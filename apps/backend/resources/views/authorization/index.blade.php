@@ -1,0 +1,1 @@
+<x-layouts.app title="Permisos y módulos"><div class="mb-6"><h1 class="admin-title">Permisos y módulos</h1><p class="admin-muted mt-1">Los cambios se aplican en el servidor de inmediato.</p></div><livewire:authorization-manager /></x-layouts.app>

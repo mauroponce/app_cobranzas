@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Tenancy\AuthorizationService;
 use App\Domain\Tenancy\RoleMatrix;
+use App\Models\Permission;
+use App\Models\TenantFeature;
 use App\Models\TenantMembership;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -44,6 +47,28 @@ class ApiContextController extends Controller
         $membership = $this->activeMembership($request);
 
         return response()->json(['data' => ['tenant_id' => $membership->tenant_id, 'role' => $membership->role, 'permissions' => RoleMatrix::permissions($membership->role)]]);
+    }
+
+    public function capabilities(Request $request, AuthorizationService $authorization): JsonResponse
+    {
+        $membership = $this->activeMembership($request);
+        $permissions = Permission::query()->get()->mapWithKeys(function (Permission $permission) use ($authorization, $membership): array {
+            $decision = $authorization->decision($membership, $permission->key);
+
+            return $decision['allowed'] ? [$permission->key => $decision['scope']] : [];
+        });
+        $features = TenantFeature::forTenant($membership->tenant_id)->with('feature')->get()->map(fn (TenantFeature $feature) => [
+            'key' => $feature->feature?->key, 'enabled' => $feature->is_enabled, 'available' => $feature->is_available,
+        ])->filter(fn (array $feature) => $feature['key'] !== null)->values();
+
+        return response()->json(['data' => [
+            'user' => $request->user()->only(['id', 'name', 'email']),
+            'tenant' => $membership->tenant->only(['id', 'name', 'slug', 'timezone', 'currency']),
+            'role' => $membership->role,
+            'features' => $features,
+            'permissions' => $permissions,
+            'authorization_version' => ['tenant' => $membership->tenant->authorization_version, 'membership' => $membership->authorization_version],
+        ]]);
     }
 
     public function profile(Request $request): JsonResponse

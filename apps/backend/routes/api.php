@@ -1,17 +1,27 @@
 <?php
 
 use App\Http\Controllers\ApiContextController;
+use App\Http\Controllers\CashSettlementApiController;
 use App\Http\Controllers\CommercialApiController;
+use App\Http\Controllers\MobileAuthApiController;
+use App\Http\Controllers\MobileDeviceApiController;
+use App\Http\Controllers\PaymentApiController;
+use App\Http\Controllers\SalesApiController;
+use App\Http\Controllers\SyncApiController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', fn () => response()->json(['data' => ['status' => 'ok']]));
+Route::post('/auth/login', [MobileAuthApiController::class, 'login'])->middleware('throttle:5,1');
 Route::middleware('auth:sanctum')->group(function (): void {
+    Route::post('/auth/logout', [MobileAuthApiController::class, 'logout']);
     Route::get('/me', [ApiContextController::class, 'me']);
     Route::get('/tenants', [ApiContextController::class, 'tenants']);
     Route::post('/tenant/select', [ApiContextController::class, 'select']);
     Route::get('/permissions', [ApiContextController::class, 'permissions']);
+    Route::get('/me/capabilities', [ApiContextController::class, 'capabilities']);
     Route::get('/profile', [ApiContextController::class, 'profile']);
     Route::middleware('tenant.api')->group(function (): void {
+        Route::post('/mobile-devices', [MobileDeviceApiController::class, 'register']);
         Route::get('/customers', [CommercialApiController::class, 'customers']);
         Route::get('/customers/{customer}', [CommercialApiController::class, 'customer']);
         Route::get('/customers/{customer}/addresses', [CommercialApiController::class, 'addresses']);
@@ -19,5 +29,24 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/products/{product}', [CommercialApiController::class, 'product']);
         Route::get('/quotations', [CommercialApiController::class, 'quotations']);
         Route::get('/quotations/{quotation}', [CommercialApiController::class, 'quotation']);
+        Route::get('/sale-applications', [SalesApiController::class, 'applications']);
+        Route::get('/sale-applications/{application}', [SalesApiController::class, 'application']);
+        Route::get('/sales', [SalesApiController::class, 'sales']);
+        Route::get('/sales/{sale}', [SalesApiController::class, 'sale']);
+        Route::get('/customers/{customer}/account', [SalesApiController::class, 'account']);
+        Route::get('/customers/{customer}/outstanding', [SalesApiController::class, 'account']);
+        Route::get('/late-fee-policies', [SalesApiController::class, 'policies']);
+        Route::get('/payments', [PaymentApiController::class, 'index']);
+        Route::post('/payments', [PaymentApiController::class, 'store']);
+        Route::get('/payments/{payment}', [PaymentApiController::class, 'show']);
+        Route::post('/payments/{payment}/verify-transfer', [PaymentApiController::class, 'verifyTransfer']);
+        Route::post('/payments/{payment}/reverse', [PaymentApiController::class, 'reverse']);
+        Route::get('/settlements', [CashSettlementApiController::class, 'index']);
+        Route::post('/settlements', [CashSettlementApiController::class, 'store']);
+        Route::post('/settlements/{settlement}/submit', [CashSettlementApiController::class, 'submit']);
+        Route::post('/settlements/{settlement}/approve', [CashSettlementApiController::class, 'approve']);
+        Route::get('/sync/status', [SyncApiController::class, 'status']);
+        Route::post('/sync/push', [SyncApiController::class, 'push']);
+        Route::get('/sync/pull', [SyncApiController::class, 'pull']);
     });
 });

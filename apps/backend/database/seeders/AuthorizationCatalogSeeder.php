@@ -24,7 +24,11 @@ class AuthorizationCatalogSeeder extends Seeder
             $featureKey = match ($prefix) {
                 'products' => 'catalog', 'collections', 'payments' => 'collections', 'settlements' => 'cash_settlements', 'users', 'tenant', 'authorization' => 'administration', default => $prefix
             };
-            $permission = Permission::firstOrCreate(['key' => $capability], ['feature_id' => $features[$featureKey]->id, 'description' => $capability]);
+            $scopes = match ($capability) {
+                'payments.view', 'payments.create', 'settlements.view', 'settlements.create', 'settlements.submit', 'customers.view', 'sales.view' => ['own', 'all'],
+                default => ['all'],
+            };
+            $permission = Permission::firstOrCreate(['key' => $capability], ['feature_id' => $features[$featureKey]->id, 'description' => $capability, 'allowed_scopes' => $scopes]);
             foreach (RoleMatrix::ROLES as $role) {
                 if (in_array($capability, RoleMatrix::permissions($role), true)) {
                     RolePermission::firstOrCreate(['role' => $role, 'permission_id' => $permission->id], ['scope' => 'all']);
@@ -33,7 +37,7 @@ class AuthorizationCatalogSeeder extends Seeder
         }
         foreach (Tenant::all() as $tenant) {
             foreach ($features as $feature) {
-                TenantFeature::firstOrCreate(['tenant_id' => $tenant->id, 'feature_id' => $feature->id], ['is_enabled' => true, 'enabled_at' => now()]);
+                TenantFeature::firstOrCreate(['tenant_id' => $tenant->id, 'feature_id' => $feature->id], ['is_available' => true, 'available_at' => now(), 'is_enabled' => true, 'enabled_at' => now()]);
             }
         }
     }

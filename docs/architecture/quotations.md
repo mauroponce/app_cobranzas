@@ -10,12 +10,12 @@ Las fechas horarias del panel se presentan en la zona horaria configurada para l
 
 Los importes monetarios se convierten a centavos enteros y las cantidades a milésimos. Cada línea se calcula como `redondeo_mitad_arriba(cantidad_milésimos × precio_centavos / 1000)`; subtotal es la suma de líneas; total es subtotal porque el descuento autorizado inicial es cero. El anticipo debe estar entre cero y total, y `financed_amount = total − down_payment_amount`. En contado, el anticipo representa el total y el saldo a financiar es cero. Los valores calculados y precios nunca se aceptan del navegador. PostgreSQL agrega restricciones de importes no negativos y coherencia de saldo.
 
-La modalidad `financed` permite registrar cantidad y frecuencia de cuotas como propuesta. `estimated_installment_amount` permanece nulo: todavía no existe una política de tasa, interés o recargo. La interfaz y el PDF lo indican como pendiente de confirmación. No se crean ventas ni cuotas reales.
+La modalidad `financed` permite registrar cantidad y frecuencia de cuotas como propuesta. `estimated_installment_amount` permanece nulo: todavía no existe una política de tasa, interés o recargo. La interfaz y el PDF lo indican como pendiente de confirmación. El presupuesto aún no crea ventas ni cuotas; una solicitud aprobada inicia ese flujo según [solicitudes y ventas](sales.md).
 
 `PRE-000001` proviene de `tenant_counters` dentro de una transacción con bloqueo; hay una prueba de cuatro procesos concurrentes. `customer_snapshot`, `address_snapshot` y `quotation_items` congelan datos documentales. El PDF de propuestas aprobadas o emitidas se genera bajo demanda con Dompdf y acceso autorizado; no se guarda en una ruta pública. No incluye costos ni notas internas. La vista de impresión usa la misma plantilla. El PDF se sirve con recursos locales y la carga remota de Dompdf desactivada.
 
 ## API y próximos pasos
 
-`GET /api/v1/quotations` y `GET /api/v1/quotations/{id}` son de solo lectura, con tenant ligado al token Sanctum. La conversión a venta y la política financiera corresponden a la etapa 4. Antes de automatizar WhatsApp o crédito deberán definirse reglas verificables con Trotamundos.
+`GET /api/v1/quotations` y `GET /api/v1/quotations/{id}` son de solo lectura, con tenant ligado al token Sanctum. La conversión a venta y las condiciones financieras aprobadas se describen en [solicitudes y ventas](sales.md). Antes de automatizar WhatsApp o crédito deberán definirse reglas verificables con Trotamundos.
 
 No se encontró `PROCEDIMIENTO PARA VENTA.pdf` en el repositorio. El flujo aquí descrito implementa la solicitud de esta etapa; no afirma reproducir reglas adicionales de ese procedimiento.

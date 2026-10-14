@@ -21,7 +21,7 @@ class CollectionWorkflowApiController extends Controller
     {
         $data = $request->validate([
             'visit_id' => ['required', 'uuid'], 'operation_id' => ['required', 'uuid'], 'declared_at' => ['nullable', 'date'],
-            'components' => ['required', 'array', 'min:1', 'max:2'], 'components.*.method' => ['required', 'in:cash,bank_transfer'],
+            'components' => ['required', 'array', 'min:1', 'max:2'], 'components.*.method' => ['required', 'distinct', 'in:cash,bank_transfer'],
             'components.*.amount' => ['required', 'string', 'max:32'], 'components.*.reference' => ['nullable', 'string', 'max:160'],
         ]);
         return response()->json(['data' => $workflow->declare($request->attributes->get('activeTenant'), $request->user(), $data)], 201);

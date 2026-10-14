@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CollectionDeclaration extends Model
 {
@@ -16,4 +18,8 @@ class CollectionDeclaration extends Model
     {
         return ['amount' => 'decimal:2', 'declared_at' => 'datetime', 'received_at' => 'datetime', 'approved_at' => 'datetime'];
     }
+
+    public function customer(): BelongsTo { return $this->belongsTo(Customer::class); }
+    public function visit(): BelongsTo { return $this->belongsTo(CollectionVisit::class); }
+    public function components(): HasMany { return $this->hasMany(CollectionDeclarationComponent::class, 'declaration_id'); }
 }

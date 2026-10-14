@@ -64,7 +64,7 @@ class SyncApiController extends Controller
             ->whereHas('route', fn ($query) => $query->where('collector_membership_id', $membership->id)->where('route_date', today($tenant->timezone))->whereIn('status', ['published', 'in_progress']))
             ->with('customer:id,first_name,last_name')
             ->orderBy('sequence')
-            ->get(['id', 'customer_id', 'sequence', 'status', 'address_snapshot']);
+            ->get(['id', 'customer_id', 'sequence', 'status']);
         $routeCustomerIds = $routeStops->pluck('customer_id');
         $routeBalances = CustomerAccountEntry::forTenant($tenant)->whereIn('customer_id', $routeCustomerIds)->where('status', 'open')->selectRaw('customer_id, SUM(outstanding_amount) AS outstanding_amount')->groupBy('customer_id')->pluck('outstanding_amount', 'customer_id');
         $stops = $routeStops->map(fn (CollectionVisit $stop): array => [
@@ -83,7 +83,7 @@ class SyncApiController extends Controller
     private function process($tenant, $actor, object $device, array $operation, PaymentService $payments, CollectionWorkflowService $workflow): array
     {
         try {
-            return DB::transaction(function () use ($tenant, $actor, $device, $operation, $payments): array {
+            return DB::transaction(function () use ($tenant, $actor, $device, $operation, $payments, $workflow): array {
                 $hash = hash('sha256', json_encode($this->canonical($operation['payload']), JSON_THROW_ON_ERROR));
                 $existing = DB::table('mobile_sync_operations')->where('tenant_id', $tenant->id)->where('operation_id', $operation['operation_id'])->lockForUpdate()->first();
                 if ($existing) {

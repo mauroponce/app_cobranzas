@@ -16,7 +16,7 @@ class CollectionRoute extends Model
     public const PUBLISHED = 'published';
     public const CANCELLED = 'cancelled';
 
-    protected $fillable = ['tenant_id', 'route_date', 'collector_membership_id', 'zone_id', 'name', 'description', 'status', 'created_by_membership_id', 'published_by_membership_id', 'published_at', 'cancelled_at', 'cancellation_reason', 'version'];
+    protected $fillable = ['tenant_id', 'route_date', 'collector_membership_id', 'zone_id', 'name', 'description', 'status', 'created_by_membership_id', 'published_by_membership_id', 'published_at', 'started_at', 'completed_at', 'cancelled_at', 'cancellation_reason', 'version'];
 
     protected function casts(): array
     {

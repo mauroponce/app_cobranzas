@@ -1,1 +1,1 @@
-<x-layouts.app title="Cobranzas"><div class="mb-6"><h1 class="admin-title">Cobranzas</h1><p class="admin-muted mt-1">Revisá y conciliá las declaraciones enviadas por cobradores.</p></div><livewire:collections-dashboard /></x-layouts.app>
+<x-layouts.app title="Cobranzas"><livewire:collections-dashboard /></x-layouts.app>

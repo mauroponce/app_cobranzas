@@ -3,12 +3,13 @@
 namespace Tests\Feature;
 
 use App\Domain\Collections\CollectionAssignmentService;
+use App\Domain\Collections\CollectionRouteService;
 use App\Domain\Collections\PaymentService;
 use App\Domain\Tenancy\AuthorizationManagementService;
 use App\Livewire\CollectionPortfolioManager;
 use App\Livewire\CollectionStructuresManager;
 use App\Models\CollectionRoute;
-use App\Models\CollectionRouteStop;
+use App\Models\CollectionVisit;
 use App\Models\CollectionTeam;
 use App\Models\CollectionTeamMember;
 use App\Models\CollectionZone;
@@ -50,10 +51,12 @@ class CollectionPortfolioTest extends TestCase
         return Customer::create(['tenant_id' => $owner->tenant_id, 'customer_number' => 'CLI-'.uniqid(), 'first_name' => 'Cliente', 'last_name' => 'Cartera', 'status' => 'active', 'created_by' => $owner->user_id]);
     }
 
-    private function debt(TenantMembership $owner, Customer $customer): void
+    private function debt(TenantMembership $owner, Customer $customer): Sale
     {
         $sale = Sale::create(['tenant_id' => $owner->tenant_id, 'sale_number' => 'VEN-'.uniqid(), 'customer_id' => $customer->id, 'seller_id' => $owner->user_id, 'sale_type' => 'cash', 'status' => 'confirmed', 'total_amount' => '10.00', 'currency' => 'ARS', 'subtotal' => '10.00', 'discount_amount' => '0.00', 'down_payment_amount' => '10.00', 'financed_principal' => '0.00', 'financing_charge_amount' => '0.00', 'financed_total' => '0.00']);
         CustomerAccountEntry::create(['tenant_id' => $owner->tenant_id, 'customer_id' => $customer->id, 'sale_id' => $sale->id, 'entry_type' => 'cash', 'amount' => '10.00', 'outstanding_amount' => '10.00', 'due_date' => today(), 'status' => 'open']);
+
+        return $sale;
     }
 
     public function test_assigned_collector_can_only_pull_and_collect_its_active_portfolio(): void
@@ -99,6 +102,7 @@ class CollectionPortfolioTest extends TestCase
         $owner = $this->member('owner');
         $collector = $this->member('collector', $owner->tenant);
         $customer = $this->customer($owner);
+        $sale = $this->debt($owner, $customer);
         $route = CollectionRoute::create([
             'tenant_id' => $owner->tenant_id,
             'route_date' => today(),
@@ -110,22 +114,44 @@ class CollectionPortfolioTest extends TestCase
             'published_at' => now(),
             'version' => 1,
         ]);
-        CollectionRouteStop::create([
+        CollectionVisit::create([
             'tenant_id' => $owner->tenant_id,
             'route_id' => $route->id,
+            'sale_id' => $sale->id,
             'customer_id' => $customer->id,
             'sequence' => 1,
-            'assigned_collector_membership_id' => $collector->id,
             'status' => 'pending',
-            'address_snapshot' => ['street' => 'Calle Uno', 'street_number' => '10', 'city' => 'Prueba'],
+            'scheduled_amount' => '10.00',
+            'obligation_snapshot' => [],
         ]);
 
         $token = $collector->user->createToken('route')->plainTextToken;
         $this->withToken($token)->postJson('/api/v1/tenant/select', ['tenant_id' => $owner->tenant_id])->assertOk();
         $this->withToken($token)->getJson('/api/v1/sync/pull?cursor=0')->assertOk()
             ->assertJsonPath('data.route_stops.0.customer_id', $customer->id)
-            ->assertJsonPath('data.route_stops.0.due_amount_cents', '0');
+            ->assertJsonPath('data.route_stops.0.due_amount_cents', '1000');
 
+    }
+
+    public function test_administrator_can_program_a_published_route_with_confirmed_sales(): void
+    {
+        $owner = $this->member('owner');
+        $collector = $this->member('collector', $owner->tenant);
+        $customer = $this->customer($owner);
+        $sale = $this->debt($owner, $customer);
+
+        $route = app(CollectionRouteService::class)->program($owner->tenant, $owner->user, $collector->id, today()->toDateString(), [$sale->id]);
+
+        $this->assertSame('published', $route->status);
+        $this->assertSame($collector->id, $route->collector_membership_id);
+        $this->assertDatabaseHas('collection_visits', [
+            'tenant_id' => $owner->tenant_id,
+            'route_id' => $route->id,
+            'sale_id' => $sale->id,
+            'customer_id' => $customer->id,
+            'status' => 'pending',
+            'scheduled_amount' => '10.00',
+        ]);
     }
 
     public function test_reassignment_invalidates_cached_portfolio_and_revoked_collection_permission_preserves_sync_for_review(): void

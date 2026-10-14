@@ -35,6 +35,7 @@ final class CollectionWorkflowService
             $route = CollectionRoute::forTenant($tenant)->whereKey($visit->route_id)->lockForUpdate()->firstOrFail();
             abort_unless($route->collectorMembership?->user_id === $actor->id, 403);
             if ($visit->status !== 'pending') throw ValidationException::withMessages(['visit' => 'La visita ya no admite declaraciones.']);
+            if ($route->status !== 'in_progress') throw ValidationException::withMessages(['route' => 'La hoja debe estar iniciada para registrar una declaración.']);
             $total = array_sum(array_map(fn ($component) => Decimal::toInteger($component['amount']), $data['components']));
             if ($total <= 0) throw ValidationException::withMessages(['components' => 'El importe debe ser mayor que cero.']);
             $declaration = CollectionDeclaration::firstOrCreate(['tenant_id' => $tenant->id, 'operation_id' => $data['operation_id']], [
@@ -56,6 +57,8 @@ final class CollectionWorkflowService
             $visit = CollectionVisit::forTenant($tenant)->whereKey($visit->id)->lockForUpdate()->firstOrFail();
             $route = CollectionRoute::forTenant($tenant)->whereKey($visit->route_id)->lockForUpdate()->firstOrFail();
             abort_unless($route->collectorMembership?->user_id === $actor->id, 403);
+            if ($visit->status !== 'pending') throw ValidationException::withMessages(['visit' => 'La visita ya fue registrada.']);
+            if ($route->status !== 'in_progress') throw ValidationException::withMessages(['route' => 'La hoja debe estar iniciada para registrar la visita.']);
             if ($reason === 'other' && blank($notes)) throw ValidationException::withMessages(['notes' => 'Detallá el motivo.']);
             $visit->update(['status' => 'recorded', 'outcome' => 'no_payment', 'no_payment_reason' => $reason, 'no_payment_notes' => $notes, 'recorded_at' => now(), 'received_at' => now()]);
             Audit::record('collection_visit.no_payment', $visit, $actor, $tenant->id);

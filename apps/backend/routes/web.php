@@ -40,7 +40,7 @@ Route::middleware('auth')->group(function (): void {
     Route::patch('/platform/tenants/{tenant}', [PlatformTenantController::class, 'update'])->name('platform.tenants.update');
 
     Route::middleware('tenant.admin')->group(function (): void {
-        Route::view('/dashboard', 'dashboard')->name('dashboard');
+        Route::redirect('/dashboard', '/admin/collections')->name('dashboard');
         Route::view('/admin/collections', 'collections.index')->name('collections.index');
         Route::view('/admin/collections/portfolios', 'collections.portfolios')->name('collections.portfolios');
         Route::view('/admin/collections/structures', 'collections.structures')->name('collections.structures');

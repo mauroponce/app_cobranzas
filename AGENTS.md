@@ -25,6 +25,8 @@ Consultá `docs/architecture/overview.md` y la matriz `apps/backend/app/Domain/T
 
 Consultá `docs/architecture/customers.md`, `catalog.md` y `quotations.md` antes de modificar clientes, precios o presupuestos. Los importes se calculan con `Domain/Commercial/Decimal.php` en centavos enteros; no uses `float` para cálculos ni visualización de dinero. Mantener snapshots históricos, claves compuestas `(tenant_id, id)`, períodos sin solapamiento y transiciones auditadas. La cuota estimada queda vacía hasta definir una política de financiación.
 
-## Etapa 4: solicitudes, ventas y documentos
+## Ventas, documentos y cobranzas
 
-Consultá `docs/architecture/sales.md` antes de modificar solicitudes, evaluaciones, ventas, cuotas, cuenta corriente, mora o documentos. La venta se confirma únicamente desde una solicitud aprobada mediante `ConfirmSaleAction`; el anticipo y el contado son obligaciones pendientes hasta registrar un cobro. La confirmación bloquea la solicitud y crea obligaciones una sola vez. Los documentos privados usan el disco `r2`; los PDFs se generan después del commit mediante un job que reconstruye el tenant. No agregues tasas ni recargos por defecto. La etapa 5 (cobranzas y autorización modular avanzada) sigue fuera de alcance.
+Consultá `docs/architecture/sales.md` antes de modificar solicitudes, evaluaciones, ventas, cuotas, cuenta corriente, mora o documentos. La venta se confirma únicamente desde una solicitud aprobada mediante `ConfirmSaleAction`; el anticipo y el contado son obligaciones pendientes hasta registrar un cobro. La confirmación bloquea la solicitud y crea obligaciones una sola vez. Los documentos privados usan el disco `r2`; los PDFs se generan después del commit mediante un job que reconstruye el tenant. No agregues tasas ni recargos por defecto.
+
+Para cualquier modificación de cobranzas, consultá primero `docs/definicion_funcional.MD`: es la fuente de verdad funcional y prevalece sobre propuestas, prototipos y documentación anterior. Cuando una decisión funcional nueva quede confirmada, actualizá ese documento dentro del mismo cambio.

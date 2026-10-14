@@ -22,25 +22,8 @@
         </a>
         <nav class="admin-sidebar-scroll">
             @if(request()->attributes->get('activeTenant'))<p class="admin-nav-caption">OPERACIONES</p>
-            <x-ui.nav-link icon="dashboard" label="Dashboard" href="{{ route('dashboard') }}" :active="request()->routeIs('dashboard')" />
-            @can('customers.view')<x-ui.nav-link icon="users" label="Clientes" :href="route('customers.index')" :active="request()->routeIs('customers.*')" />@endcan
-            @can('products.view')<x-ui.nav-link icon="bag" label="Productos" :href="route('products.index')" :active="request()->routeIs('products.*')" />@endcan
-            @can('quotations.view')<x-ui.nav-link icon="receipt" label="Presupuestos" :href="route('quotations.index')" :active="request()->routeIs('quotations.*')" />@endcan
-            @can('sales.view')<x-ui.nav-link icon="receipt" label="Solicitudes de venta" :href="route('sale-applications.index')" :active="request()->routeIs('sale-applications.*')" />@endcan
-            @can('sales.view')<x-ui.nav-link icon="bag" label="Ventas" :href="route('sales.index')" :active="request()->routeIs('sales.*')" />@endcan
-            @can('sales.view')<x-ui.nav-link icon="chart" label="Políticas de mora" :href="route('late-fee-policies.index')" :active="request()->routeIs('late-fee-policies.*')" />@endcan
             @can('payments.view')<x-ui.nav-link icon="wallet" label="Cobranzas" :href="route('collections.index')" :active="request()->routeIs('collections.*')" />@endcan
-            @can('authorization.view')<x-ui.nav-link icon="user-cog" label="Permisos y módulos" :href="route('authorization.index')" :active="request()->routeIs('authorization.*')" />@endcan
-            @foreach (['routes' => ['Rutas y visitas','route'], 'collectors' => ['Cobradores','user-cog']] as $section => [$label, $icon])
-                @can(match($section) {'sales' => 'sales.view', 'collections' => 'collections.view', 'routes' => 'routes.view', 'collectors' => 'routes.view', 'settlements' => 'settlements.view'})<x-ui.nav-link :icon="$icon" :label="$label" :href="route('modules.show', $section)" :active="request()->route('section') === $section" />@endcan
-            @endforeach
-            <p class="admin-nav-caption">ADMINISTRACIÓN</p>
-            @can('users.view')<x-ui.nav-link icon="user-cog" label="Usuarios y roles" href="{{ route('admin.users') }}" :active="request()->routeIs('admin.users*')" />@endcan
-            @can('users.view')<x-ui.nav-link icon="mail" label="Invitaciones" href="{{ route('admin.invitations') }}" :active="request()->routeIs('admin.invitations*')" />@endcan
-            @can('reports.view')<x-ui.nav-link icon="chart" label="Reportes" :href="route('modules.show', 'reports')" :active="request()->route('section') === 'reports'" />@endcan
-            @can('tenant.view')<x-ui.nav-link icon="settings" label="Configuración" :href="route('admin.company')" :active="request()->routeIs('admin.company')" />@endcan
             @endif
-            @can('platform.access')<p class="admin-nav-caption">PLATAFORMA</p><x-ui.nav-link icon="layers" label="Empresas" :href="route('platform.tenants')" :active="request()->routeIs('platform.*')" />@endcan
         </nav>
         <div class="admin-sidebar-footer">
             <span class="admin-avatar">{{ strtoupper(substr(auth()->user()->name, 0, 2)) }}</span>

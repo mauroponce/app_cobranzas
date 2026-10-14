@@ -22,6 +22,7 @@ export type LocalPayment = {
   status: string;
   recorded_at: string;
   payment_id: string | null;
+  result: string | null;
 };
 export type LocalRouteStop = {
   id: string;
@@ -29,6 +30,7 @@ export type LocalRouteStop = {
   customer_name: string;
   sequence: number;
   status: string;
+  outcome: string | null;
   address: string | null;
   due_amount_cents: string | null;
 };
@@ -53,14 +55,14 @@ export async function obligations(scope: string, customerId: string): Promise<Lo
 export async function payments(scope: string): Promise<LocalPayment[]> {
   const db = await initializeDatabase();
   return db.getAllAsync<LocalPayment>(
-    'SELECT operation_id, customer_id, amount, status, recorded_at, payment_id FROM local_payments WHERE scope_key = ? ORDER BY recorded_at DESC',
+    'SELECT operation_id, customer_id, amount, status, recorded_at, payment_id, result FROM local_payments WHERE scope_key = ? ORDER BY recorded_at DESC',
     scope,
   );
 }
 export async function routeStops(scope: string): Promise<LocalRouteStop[]> {
   const db = await initializeDatabase();
   return db.getAllAsync<LocalRouteStop>(
-    'SELECT id, customer_id, customer_name, sequence, status, address, due_amount_cents FROM authorized_route_stops WHERE scope_key = ? ORDER BY sequence',
+    'SELECT id, customer_id, customer_name, sequence, status, outcome, address, due_amount_cents FROM authorized_route_stops WHERE scope_key = ? ORDER BY sequence',
     scope,
   );
 }

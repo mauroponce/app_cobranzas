@@ -190,6 +190,43 @@ class CollectionPortfolioTest extends TestCase
         $this->assertSame('pending', $declaration->status);
         $this->assertSame('recorded', $visit->fresh()->status);
         $this->assertNotSame('', app(CollectionDashboardNotifier::class)->revision($owner->tenant_id));
+
+        $secondOperationId = (string) Str::uuid();
+        $this->withToken($token)->postJson('/api/v1/sync/push', ['device_id' => $device, 'operations' => [[
+            'operation_id' => $secondOperationId,
+            'schema_version' => 1,
+            'type' => 'collection_declaration',
+            'recorded_at' => now()->addMinute()->toIso8601String(),
+            'payload' => ['visit_id' => $visit->id, 'components' => [['method' => 'cash', 'amount' => '2.00']]],
+        ]]])->assertOk()->assertJsonPath('data.operations.0.status', 'pending_review');
+
+        $this->assertDatabaseCount('collection_declarations', 2);
+        $this->assertDatabaseHas('collection_declarations', [
+            'tenant_id' => $owner->tenant_id,
+            'visit_id' => $visit->id,
+            'operation_id' => $secondOperationId,
+            'amount' => '2.00',
+        ]);
+        $this->assertSame('recorded', $visit->fresh()->status);
+        $this->assertSame('paid', $visit->fresh()->outcome);
+
+        $this->withToken($token)->getJson('/api/v1/sync/pull?cursor=0')
+            ->assertOk()
+            ->assertJsonPath('data.route_stops.0.status', 'recorded')
+            ->assertJsonPath('data.route_stops.0.outcome', 'paid');
+
+        $route->update(['status' => CollectionRoute::COMPLETED, 'completed_at' => now()]);
+        $this->withToken($token)->postJson('/api/v1/sync/push', ['device_id' => $device, 'operations' => [[
+            'operation_id' => (string) Str::uuid(),
+            'schema_version' => 1,
+            'type' => 'collection_declaration',
+            'recorded_at' => now()->addMinutes(2)->toIso8601String(),
+            'payload' => ['visit_id' => $visit->id, 'components' => [['method' => 'cash', 'amount' => '1.00']]],
+        ]]])->assertOk()
+            ->assertJsonPath('data.operations.0.status', 'rejected')
+            ->assertJsonPath('data.operations.0.error', 'La hoja debe estar iniciada para registrar una declaración.');
+
+        $this->assertDatabaseCount('collection_declarations', 2);
     }
 
     public function test_collections_stream_requires_the_active_tenant_and_emits_an_invalidation_without_financial_data(): void

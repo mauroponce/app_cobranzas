@@ -16,6 +16,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class SyncApiController extends Controller
 {
@@ -71,7 +72,7 @@ class SyncApiController extends Controller
             ->when($route, fn ($query) => $query->where('route_id', $route->id), fn ($query) => $query->whereRaw('1 = 0'))
             ->with('customer:id,first_name,last_name')
             ->orderBy('sequence')
-            ->get(['id', 'customer_id', 'sequence', 'status']);
+            ->get(['id', 'customer_id', 'sequence', 'status', 'outcome']);
         $routeCustomerIds = $routeStops->pluck('customer_id');
         $routeBalances = CustomerAccountEntry::forTenant($tenant)->whereIn('customer_id', $routeCustomerIds)->where('status', 'open')->selectRaw('customer_id, SUM(outstanding_amount) AS outstanding_amount')->groupBy('customer_id')->pluck('outstanding_amount', 'customer_id');
         $stops = $routeStops->map(fn (CollectionVisit $stop): array => [
@@ -80,6 +81,7 @@ class SyncApiController extends Controller
             'customer_name' => trim($stop->customer->last_name.', '.$stop->customer->first_name),
             'sequence' => $stop->sequence,
             'status' => $stop->status,
+            'outcome' => $stop->outcome,
             'address' => '',
             'due_amount_cents' => (string) Decimal::toInteger((string) ($routeBalances[$stop->customer_id] ?? '0.00')),
         ]);
@@ -122,10 +124,18 @@ class SyncApiController extends Controller
 
     private function declaration($tenant, $actor, array $operation, CollectionWorkflowService $workflow, bool $revoked): array
     {
-        if ($revoked) return ['status' => 'rejected', 'reason' => 'device_revoked'];
+        if ($revoked) {
+            return ['status' => 'rejected', 'reason' => 'device_revoked'];
+        }
         try {
             $declaration = $workflow->declare($tenant, $actor, $operation['payload'] + ['operation_id' => $operation['operation_id'], 'declared_at' => $operation['recorded_at']]);
+
             return ['status' => 'pending_review', 'declaration_id' => $declaration->id];
+        } catch (ValidationException $exception) {
+            return [
+                'status' => 'rejected',
+                'error' => collect($exception->errors())->flatten()->first() ?? 'La declaración no cumple las condiciones de la visita.',
+            ];
         } catch (\Throwable) {
             return ['status' => 'rejected', 'error' => 'No se pudo registrar la declaración.'];
         }

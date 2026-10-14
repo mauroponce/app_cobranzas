@@ -3,8 +3,13 @@ import { queueOfflineCashPayment, queueOfflineCollectionDeclaration } from './ou
 import { resetSqliteMock, sqliteRows } from '../../test/sqliteMock';
 
 const payment = (overrides = {}) => ({
-  operationId: 'operation-1', tenantId: 'tenant-a', userId: 'user-a', deviceId: 'device-a', recordedAt: '2026-10-12T00:00:00.000Z',
-  payload: { customer_id: 'customer-a', amount: '125.50', received_at: '2026-10-12T00:00:00.000Z' }, ...overrides,
+  operationId: 'operation-1',
+  tenantId: 'tenant-a',
+  userId: 'user-a',
+  deviceId: 'device-a',
+  recordedAt: '2026-10-12T00:00:00.000Z',
+  payload: { customer_id: 'customer-a', amount: '125.50', received_at: '2026-10-12T00:00:00.000Z' },
+  ...overrides,
 });
 
 describe('offline cash outbox', () => {
@@ -13,8 +18,18 @@ describe('offline cash outbox', () => {
   it('stores the local payment and outbox operation atomically with its identity', async () => {
     await queueOfflineCashPayment(payment());
     const rows = sqliteRows();
-    expect(rows.outbox.get('operation-1')).toMatchObject({ tenant_id: 'tenant-a', user_id: 'user-a', device_id: 'device-a', payload: expect.stringContaining('125.50'), status: 'pending' });
-    expect(rows.payments.get('operation-1')).toMatchObject({ scope_key: 'tenant-a:user-a', amount: '125.50', status: 'pending_sync' });
+    expect(rows.outbox.get('operation-1')).toMatchObject({
+      tenant_id: 'tenant-a',
+      user_id: 'user-a',
+      device_id: 'device-a',
+      payload: expect.stringContaining('125.50'),
+      status: 'pending',
+    });
+    expect(rows.payments.get('operation-1')).toMatchObject({
+      scope_key: 'tenant-a:user-a',
+      amount: '125.50',
+      status: 'pending_sync',
+    });
   });
 
   it('stores a collection declaration in the outbox and visible local history', async () => {
@@ -40,6 +55,26 @@ describe('offline cash outbox', () => {
       amount: '125.50',
       status: 'pending',
     });
+
+    await queueOfflineCollectionDeclaration({
+      operationId: 'declaration-2',
+      tenantId: 'tenant-a',
+      userId: 'user-a',
+      deviceId: 'device-a',
+      customerId: 'customer-a',
+      recordedAt: '2026-10-12T00:01:00.000Z',
+      payload: {
+        visit_id: 'visit-a',
+        components: [{ method: 'cash', amount: '25.00' }],
+      },
+    });
+
+    expect([...sqliteRows().outbox.values()]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ operation_id: 'declaration-1' }),
+        expect.objectContaining({ operation_id: 'declaration-2' }),
+      ]),
+    );
   });
 
   it('rolls back the outbox insert when the local payment write fails', async () => {
@@ -57,7 +92,9 @@ describe('offline cash outbox', () => {
 
   it('keeps pending data across another database initialization and separates tenants', async () => {
     await queueOfflineCashPayment(payment());
-    await queueOfflineCashPayment(payment({ operationId: 'operation-2', tenantId: 'tenant-b', userId: 'user-b' }));
+    await queueOfflineCashPayment(
+      payment({ operationId: 'operation-2', tenantId: 'tenant-b', userId: 'user-b' }),
+    );
     await initializeDatabase();
     const rows = sqliteRows();
     expect([...rows.outbox.values()].filter((row) => row.tenant_id === 'tenant-a')).toHaveLength(1);

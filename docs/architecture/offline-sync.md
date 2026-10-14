@@ -14,10 +14,11 @@ separados por empresa y usuario.
 
 El registro móvil envía una operación `collection_declaration` con UUID, visita,
 fecha e integrantes de efectivo y/o transferencia. Al aceptarla, Laravel crea
-una declaración pendiente y marca la visita como registrada dentro de la misma
-transacción. El UUID y el hash del payload mantienen la idempotencia: reintentar
-una operación igual devuelve el resultado persistido y nunca duplica la
-declaración.
+una declaración pendiente. La primera marca la visita como registrada con pago;
+otras operaciones con UUID distintos pueden agregar nuevos cobros a esa visita
+mientras la hoja siga en curso. Cada declaración se concilia por separado. El
+UUID y el hash del payload mantienen la idempotencia: reintentar una operación
+igual devuelve el resultado persistido y nunca duplica la declaración.
 
 La declaración no reduce deuda. La transferencia pura se concilia de forma
 individual; el efectivo y los cobros combinados esperan la rendición de la hoja.

@@ -127,6 +127,7 @@ async function runSync(session: Session, options: SyncOptions): Promise<void> {
             customer_name: string;
             sequence: number;
             status: string;
+            outcome: string | null;
             address: string;
             due_amount_cents: string;
           }[];
@@ -171,13 +172,14 @@ async function runSync(session: Session, options: SyncOptions): Promise<void> {
           );
         for (const stop of pull.data.route_stops ?? [])
           await db.runAsync(
-            'INSERT OR REPLACE INTO authorized_route_stops (scope_key,id,customer_id,customer_name,sequence,status,address,due_amount_cents) VALUES (?,?,?,?,?,?,?,?)',
+            'INSERT OR REPLACE INTO authorized_route_stops (scope_key,id,customer_id,customer_name,sequence,status,outcome,address,due_amount_cents) VALUES (?,?,?,?,?,?,?,?,?)',
             scope,
             stop.id,
             stop.customer_id,
             stop.customer_name,
             stop.sequence,
             stop.status,
+            stop.outcome,
             stop.address,
             stop.due_amount_cents,
           );

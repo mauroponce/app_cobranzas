@@ -22,22 +22,22 @@ export function AppHeader({ eyebrow, title, subtitle, onBack, onNotifications }:
         />
       )}
       <View style={styles.copy}>
-        {eyebrow && (
+        {eyebrow ? (
           <Text
             variant="labelSmall"
             style={{ color: theme.colors.primary, letterSpacing: 1.2, fontWeight: '800' }}
           >
             {eyebrow.toUpperCase()}
           </Text>
-        )}
+        ) : null}
         <Text variant="headlineSmall" style={[styles.title, { color: theme.colors.onSurface }]}>
           {title}
         </Text>
-        {subtitle && (
+        {subtitle ? (
           <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
             {subtitle}
           </Text>
-        )}
+        ) : null}
       </View>
       {onNotifications && (
         <IconButton

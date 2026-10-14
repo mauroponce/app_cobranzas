@@ -38,9 +38,12 @@ export function initializeDatabase(): Promise<SQLite.SQLiteDatabase> {
       )`);
       await database.execAsync(`CREATE TABLE IF NOT EXISTS authorized_route_stops (
         scope_key TEXT NOT NULL, id TEXT NOT NULL, customer_id TEXT NOT NULL, customer_name TEXT NOT NULL,
-        sequence INTEGER NOT NULL, status TEXT NOT NULL, address TEXT, due_amount_cents TEXT,
+        sequence INTEGER NOT NULL, status TEXT NOT NULL, outcome TEXT, address TEXT, due_amount_cents TEXT,
         PRIMARY KEY (scope_key, id)
       )`);
+      try {
+        await database.execAsync('ALTER TABLE authorized_route_stops ADD COLUMN outcome TEXT');
+      } catch {}
       await database.execAsync(`CREATE TABLE IF NOT EXISTS authorized_routes (
         scope_key TEXT PRIMARY KEY NOT NULL, id TEXT NOT NULL, status TEXT NOT NULL, route_date TEXT NOT NULL
       )`);

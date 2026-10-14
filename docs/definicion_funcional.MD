@@ -32,6 +32,9 @@ Perfil. Inicio resume únicamente las visitas asignadas y las operaciones locale
 pendientes de sincronización; no presenta metas ni importes ficticios. Clientes
 permite consultar la cartera autorizada sincronizada y sus obligaciones; el
 registro de un cobro se inicia desde una visita asignada.
+Los mensajes operativos deben explicar con claridad si una acción quedó
+guardada localmente, fue sincronizada o fue rechazada, incluyendo la restricción
+que impide continuar cuando corresponda.
 
 El panel administrativo lista todas las declaraciones de cobro. Las nuevas
 declaraciones aceptadas desde la sincronización móvil actualizan esa tabla en
@@ -59,6 +62,14 @@ invalida la vista de la empresa activa.
 El cobrador puede declarar pagos en efectivo, transferencia o una combinación
 de ambos, indicando importe y medio de pago. Los comprobantes adjuntos y las
 referencias son opcionales.
+
+Una misma visita puede tener varias declaraciones de cobro mientras su hoja
+permanezca en curso. La primera declaración marca la visita como realizada con
+pago, pero no impide agregar otras declaraciones —por ejemplo, una parte en
+efectivo y otra por transferencia—. Cada declaración conserva su propio importe,
+medio, identificador y conciliación. Una visita cerrada sin pago, reasignada,
+cancelada o perteneciente a una hoja que ya no está en curso no admite nuevos
+cobros.
 
 La declaración queda visible en la cuenta del cliente como pendiente de
 conciliación, pero no reduce el saldo exigible ni la deuda definitiva. Solo la

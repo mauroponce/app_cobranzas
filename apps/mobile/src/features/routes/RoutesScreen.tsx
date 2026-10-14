@@ -9,10 +9,16 @@ import { RouteStopCard } from '../../components/RouteStopCard';
 import { StatusBadge } from '../../components/StatusBadge';
 import { formatDate } from '../../data/collectorData';
 import { useAuth } from '../../auth/AuthContext';
-import { route, routeStops, scopeKey, type LocalRoute, type LocalRouteStop } from '../../database/financial';
+import {
+  route,
+  routeStops,
+  scopeKey,
+  type LocalRoute,
+  type LocalRouteStop,
+} from '../../database/financial';
 import { apiPost } from '../../services/api/client';
 import { syncNow } from '../../sync/worker';
-import { spacing } from '../../theme/theme';
+import { palette, spacing } from '../../theme/theme';
 import type { RootStackParamList } from '../../types/navigation';
 export function RoutesScreen() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -20,6 +26,7 @@ export function RoutesScreen() {
   const [stops, setStops] = useState<LocalRouteStop[]>([]);
   const [activeRoute, setActiveRoute] = useState<LocalRoute | null>(null);
   const [starting, setStarting] = useState(false);
+  const [routeMessage, setRouteMessage] = useState('');
   const load = useCallback(() => {
     if (!state) return;
     const scope = scopeKey(state.capabilities.tenant.id, state.capabilities.user.id);
@@ -37,20 +44,41 @@ export function RoutesScreen() {
         userId: state.capabilities.user.id,
       })
         .then(load)
-        .catch(() => {});
+        .catch((reason: unknown) =>
+          setRouteMessage(
+            reason instanceof Error
+              ? reason.message
+              : 'No se pudo actualizar la hoja desde el servidor.',
+          ),
+        );
   }, [state, load]);
   const startRoute = async () => {
     if (!state || !activeRoute || activeRoute.status !== 'published') return;
     setStarting(true);
+    setRouteMessage('');
+    let startedOnServer = false;
     try {
       await apiPost(`/collection-routes/${activeRoute.id}/start`, {}, state.token);
-      await syncNow({
-        token: state.token,
-        deviceId: state.deviceId,
-        tenantId: state.capabilities.tenant.id,
-        userId: state.capabilities.user.id,
-      }, { force: true });
+      startedOnServer = true;
+      await syncNow(
+        {
+          token: state.token,
+          deviceId: state.deviceId,
+          tenantId: state.capabilities.tenant.id,
+          userId: state.capabilities.user.id,
+        },
+        { force: true },
+      );
       load();
+      setRouteMessage('Hoja iniciada. Ya podés registrar resultados y cobros.');
+    } catch (reason) {
+      const detail =
+        reason instanceof Error ? reason.message : 'No se recibió un detalle del servidor.';
+      setRouteMessage(
+        startedOnServer
+          ? `La hoja fue iniciada en el servidor, pero este dispositivo no pudo actualizarse. Volvé a sincronizar antes de registrar cobros. Detalle: ${detail}`
+          : `No se pudo iniciar la hoja. No se habilitaron visitas ni cobros. Detalle: ${detail}`,
+      );
     } finally {
       setStarting(false);
     }
@@ -88,6 +116,17 @@ export function RoutesScreen() {
               ) : (
                 <StatusBadge label="Sin hoja disponible" />
               )}
+              {routeMessage ? <Text style={styles.message}>{routeMessage}</Text> : null}
+              {!activeRoute ? (
+                <Text>
+                  Restricción: necesitás una hoja publicada para hoy antes de registrar visitas o
+                  cobros.
+                </Text>
+              ) : activeRoute.status !== 'published' && activeRoute.status !== 'in_progress' ? (
+                <Text>
+                  Restricción: esta hoja ya no está activa y no admite nuevos resultados ni cobros.
+                </Text>
+              ) : null}
             </View>
             <Text variant="titleMedium" style={styles.title}>
               Paradas de hoy
@@ -131,5 +170,6 @@ const styles = StyleSheet.create({
   header: { gap: spacing.xl, marginBottom: spacing.md },
   summary: { gap: spacing.sm },
   title: { fontWeight: '800' },
+  message: { color: palette.ink },
   separator: { height: spacing.md },
 });

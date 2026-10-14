@@ -22,9 +22,7 @@ export function VisitDetailScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (!state) return;
     const scope = scopeKey(state.capabilities.tenant.id, state.capabilities.user.id);
-    routeStops(scope).then((rows) =>
-      setStop(rows.find((row) => row.id === route.params.stopId)),
-    );
+    routeStops(scope).then((rows) => setStop(rows.find((row) => row.id === route.params.stopId)));
     currentRoute(scope).then(setActiveRoute);
   }, [route.params.stopId, state]);
   if (!stop)
@@ -38,37 +36,52 @@ export function VisitDetailScreen({ navigation, route }: Props) {
         />
       </Screen>
     );
+  const routeInProgress = activeRoute?.status === 'in_progress';
+  const acceptsPayments =
+    routeInProgress &&
+    (stop.status === 'pending' || (stop.status === 'recorded' && stop.outcome === 'paid'));
+  const acceptsOutcome = routeInProgress && stop.status === 'pending';
   return (
     <Screen>
       <AppHeader
         eyebrow={`Visita ${stop.sequence}`}
         title={stop.customer_name}
-        subtitle={stop.address ?? 'Dirección no disponible'}
+        subtitle={stop.address || 'Dirección no disponible'}
         onBack={navigation.goBack}
       />
       <SurfaceCard>
         <Text variant="labelMedium">Saldo exigible</Text>
         <Text variant="headlineMedium">$ {stop.due_amount_cents ?? '0'}</Text>
-        <Text>
-          La declaración queda pendiente de conciliación administrativa.
-        </Text>
+        <Text>La declaración queda pendiente de conciliación administrativa.</Text>
       </SurfaceCard>
       <Button
         mode="contained"
-        disabled={activeRoute?.status !== 'in_progress'}
+        disabled={!acceptsOutcome}
         onPress={() => navigation.navigate('VisitOutcome', { stopId: stop.id })}
       >
         Registrar resultado
       </Button>
       <Button
         mode="outlined"
-        disabled={activeRoute?.status !== 'in_progress'}
-        onPress={() => navigation.navigate('RegisterPayment', { visitId: stop.id })}
+        disabled={!acceptsPayments}
+        onPress={() =>
+          navigation.navigate('RegisterPayment', {
+            visitId: stop.id,
+            customerId: stop.customer_id,
+          })
+        }
       >
-        Registrar cobro
+        {stop.status === 'recorded' ? 'Registrar otro cobro' : 'Registrar cobro'}
       </Button>
-      {activeRoute?.status !== 'in_progress' ? (
+      {!routeInProgress ? (
         <Text>Iniciá la hoja desde la pestaña Ruta antes de registrar un resultado.</Text>
+      ) : stop.status === 'recorded' && stop.outcome === 'paid' ? (
+        <Text>
+          Esta visita ya tiene cobros registrados. Podés agregar otros mientras la hoja siga en
+          curso.
+        </Text>
+      ) : stop.status !== 'pending' ? (
+        <Text>La visita está cerrada y no admite nuevos resultados ni cobros.</Text>
       ) : null}
     </Screen>
   );

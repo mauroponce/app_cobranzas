@@ -10,7 +10,7 @@ export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<TabParamList> | undefined;
   CustomerDetail: { customerId: string };
   VisitDetail: { stopId: string };
-  RegisterPayment: { visitId: string };
+  RegisterPayment: { visitId: string; customerId: string };
   VisitOutcome: { stopId: string };
   Settlement: undefined;
   Notifications: undefined;

@@ -9,6 +9,9 @@ Una transferencia declarada queda `pending_verification`; el comprobante no modi
 La aplicación móvil no confirma pagos directamente. Registra una declaración
 asociada a una visita de una hoja iniciada, con uno o más medios admitidos. La
 declaración queda pendiente y no reduce el saldo exigible ni la deuda definitiva.
+Una visita realizada con pago puede recibir varias declaraciones mientras la
+hoja continúe en curso; cada operación mantiene identidad, importe, medio y
+conciliación independientes.
 Una transferencia sin efectivo puede conciliarse individualmente desde el
 panel; el efectivo y las declaraciones combinadas se resuelven durante la
 rendición. El panel lista todos esos estados y recibe una invalidación SSE luego

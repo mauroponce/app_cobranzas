@@ -68,9 +68,7 @@ const database = {
         tenant_id: tenantId,
         user_id: userId,
         device_id: deviceId,
-        type: sql.includes("'collection_declaration'")
-          ? 'collection_declaration'
-          : 'cash_payment',
+        type: sql.includes("'collection_declaration'") ? 'collection_declaration' : 'cash_payment',
         payload,
         recorded_at: recordedAt,
         status: 'pending',
@@ -182,8 +180,17 @@ const database = {
       return;
     }
     if (sql.includes('authorized_route_stops')) {
-      const [scope, id, customerId, customerName, sequence, status, address, dueAmountCents] =
-        parameters as string[];
+      const [
+        scope,
+        id,
+        customerId,
+        customerName,
+        sequence,
+        status,
+        outcome,
+        address,
+        dueAmountCents,
+      ] = parameters as string[];
       state.routeStops.set(`${scope}:${id}`, {
         scope_key: scope,
         id,
@@ -191,6 +198,7 @@ const database = {
         customer_name: customerName,
         sequence,
         status,
+        outcome,
         address,
         due_amount_cents: dueAmountCents,
       });

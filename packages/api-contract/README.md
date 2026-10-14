@@ -32,6 +32,8 @@ Las colecciones responden con `data` y `meta.current_page`/`meta.last_page`. Los
 
 El mismo `pull` incluye `route`, con `id`, `status` y `route_date` de la hoja de
 la fecha actual del cobrador, o `null` cuando no existe. Las paradas continúan
-en `route_stops`. El cliente puede iniciar una hoja publicada mediante
+en `route_stops`, incluyendo `status` y `outcome`. El cliente puede iniciar una hoja publicada mediante
 `POST /api/v1/collection-routes/{id}/start` antes de enviar una operación
-`collection_declaration` por `POST /api/v1/sync/push`.
+`collection_declaration` por `POST /api/v1/sync/push`. Una visita con resultado
+`paid` acepta varias operaciones con UUID distintos mientras la hoja permanezca
+`in_progress`; cada una genera una declaración independiente.

@@ -7,7 +7,7 @@ import {
   type PropsWithChildren,
 } from 'react';
 import type { Capabilities } from '../contracts/capabilities';
-import { apiBaseUrl, apiGet, apiPost } from '../services/api/client';
+import { apiGet, apiPost } from '../services/api/client';
 import { tokenStorage } from './tokenStorage';
 
 type AuthState = { token: string; capabilities: Capabilities; deviceId: string } | null;
@@ -31,16 +31,7 @@ const deviceKey = 'app-cobranzas.device';
 async function capabilities(token: string): Promise<Capabilities> {
   const tenants = await apiGet<{ data: { id: string }[] }>('/tenants', token);
   if (!tenants.data.length) throw new Error('No tenés una empresa activa.');
-  const select = await fetch(`${apiBaseUrl}/api/v1/tenant/select`, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ tenant_id: tenants.data[0].id }),
-  });
-  if (!select.ok) throw new Error('No se pudo seleccionar la empresa.');
+  await apiPost('/tenant/select', { tenant_id: tenants.data[0].id }, token);
   return (await apiGet<{ data: Capabilities }>('/me/capabilities', token)).data;
 }
 
@@ -79,13 +70,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
       state,
       ready,
       login: async (email: string, password: string) => {
-        const response = await fetch(`${apiBaseUrl}/api/v1/auth/login`, {
-          method: 'POST',
-          headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
+        const data = await apiPost<{ data: { token: string } }>('/auth/login', {
+          email,
+          password,
         });
-        if (!response.ok) throw new Error('No se pudo iniciar sesión.');
-        const data = (await response.json()) as { data: { token: string } };
         const next = {
           token: data.data.token,
           capabilities: await capabilities(data.data.token),
@@ -104,11 +92,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       },
       logout: async () => {
         try {
-          if (state)
-            await fetch(`${apiBaseUrl}/api/v1/auth/logout`, {
-              method: 'POST',
-              headers: { Authorization: `Bearer ${state.token}` },
-            });
+          if (state) await apiPost('/auth/logout', {}, state.token);
         } finally {
           await tokenStorage.deleteItem(tokenKey);
           setState(null);

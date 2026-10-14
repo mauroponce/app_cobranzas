@@ -6,6 +6,9 @@ use App\Domain\Commercial\Decimal;
 use App\Domain\Tenancy\Audit;
 use App\Domain\Tenancy\AuthorizationService;
 use App\Models\Customer;
+use App\Models\CollectionDeclaration;
+use App\Models\CollectionDeclarationComponent;
+use App\Models\CollectionIncident;
 use App\Models\CustomerAccountEntry;
 use App\Models\CustomerCredit;
 use App\Models\Installment;
@@ -22,6 +25,41 @@ use Illuminate\Validation\ValidationException;
 
 final class PaymentService
 {
+    public function approveDeclaration(Tenant $tenant, User $actor, CollectionDeclaration $declaration, ?string $cashReceived = null): CollectionDeclaration
+    {
+        $this->require($tenant, $actor, 'payments.verify');
+
+        return DB::transaction(function () use ($tenant, $actor, $declaration, $cashReceived): CollectionDeclaration {
+            $declaration = CollectionDeclaration::forTenant($tenant)->whereKey($declaration->id)->lockForUpdate()->firstOrFail();
+            if ($declaration->status !== 'pending') throw ValidationException::withMessages(['declaration' => 'La declaración no está pendiente.']);
+            $components = CollectionDeclarationComponent::forTenant($tenant)->where('declaration_id', $declaration->id)->lockForUpdate()->get();
+            $cashBudget = $cashReceived === null ? null : $this->positive($cashReceived);
+            $cashDeclared = $components->where('method', 'cash')->sum(fn (CollectionDeclarationComponent $component) => Decimal::toInteger($component->amount));
+            foreach ($components as $component) {
+                $amount = Decimal::toInteger($component->amount);
+                if ($component->method === 'cash' && $cashBudget !== null) {
+                    $amount = min($amount, $cashBudget);
+                    $cashBudget -= $amount;
+                }
+                if ($amount === 0) continue;
+                $payment = Payment::create([
+                    'tenant_id' => $tenant->id, 'customer_id' => $declaration->customer_id, 'received_by' => $declaration->declared_by_user_id,
+                    'received_by_user_id' => $declaration->declared_by_user_id, 'registered_by_user_id' => $actor->id,
+                    'method' => $component->method, 'origin' => 'collection_declaration', 'source' => 'collection_declaration',
+                    'amount' => Decimal::format($amount), 'unallocated_amount' => Decimal::format($amount), 'currency' => 'ARS',
+                    'status' => 'confirmed', 'received_at' => $declaration->declared_at, 'confirmed_at' => now(),
+                    'reference' => $component->reference, 'external_reference' => $component->reference,
+                ]);
+                $this->allocate($payment, null);
+            }
+            $declaration->update(['status' => 'approved', 'approved_by_user_id' => $actor->id, 'approved_at' => now()]);
+            if ($cashReceived !== null && $cashDeclared !== $this->positive($cashReceived)) {
+                CollectionIncident::create(['tenant_id' => $tenant->id, 'declaration_id' => $declaration->id, 'type' => 'cash_difference', 'status' => 'open', 'details' => 'El efectivo recibido difiere de lo declarado.', 'reported_by' => $actor->id]);
+            }
+            Audit::record('collection_declaration.approved', $declaration, $actor, $tenant->id);
+            return $declaration->fresh();
+        });
+    }
     public function registerCash(Tenant $tenant, User $actor, array $data, bool $fromSync = false): Payment
     {
         return $this->register($tenant, $actor, $data + ['method' => 'cash'], $fromSync);

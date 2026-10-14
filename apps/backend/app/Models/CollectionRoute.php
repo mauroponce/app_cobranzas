@@ -26,4 +26,5 @@ class CollectionRoute extends Model
     public function collectorMembership(): BelongsTo { return $this->belongsTo(TenantMembership::class, 'collector_membership_id'); }
     public function zone(): BelongsTo { return $this->belongsTo(CollectionZone::class); }
     public function stops(): HasMany { return $this->hasMany(CollectionRouteStop::class, 'route_id'); }
+    public function visits(): HasMany { return $this->hasMany(CollectionVisit::class, 'route_id'); }
 }

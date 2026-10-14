@@ -4,6 +4,7 @@ use App\Http\Controllers\ApiContextController;
 use App\Http\Controllers\CashSettlementApiController;
 use App\Http\Controllers\CollectionPortfolioApiController;
 use App\Http\Controllers\CollectionStructureApiController;
+use App\Http\Controllers\CollectionWorkflowApiController;
 use App\Http\Controllers\CommercialApiController;
 use App\Http\Controllers\MobileAuthApiController;
 use App\Http\Controllers\MobileDeviceApiController;
@@ -34,6 +35,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/collection-teams', [CollectionStructureApiController::class, 'teams']);
         Route::post('/collection-teams', [CollectionStructureApiController::class, 'storeTeam']);
         Route::post('/collection-teams/{team}/members', [CollectionStructureApiController::class, 'addTeamMember']);
+        Route::post('/collection-routes/{route}/start', [CollectionWorkflowApiController::class, 'start']);
+        Route::post('/collection-declarations', [CollectionWorkflowApiController::class, 'declare']);
+        Route::post('/collection-declarations/{declaration}/approve', [CollectionWorkflowApiController::class, 'approve']);
+        Route::post('/collection-visits/{visit}/no-payment', [CollectionWorkflowApiController::class, 'noPayment']);
         Route::get('/customers/{customer}', [CommercialApiController::class, 'customer']);
         Route::get('/customers/{customer}/addresses', [CommercialApiController::class, 'addresses']);
         Route::get('/products', [CommercialApiController::class, 'products']);

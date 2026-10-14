@@ -22,11 +22,12 @@ export async function syncNow(session: Session, options: SyncOptions = {}): Prom
       : [session.tenantId, session.userId, new Date().toISOString()];
     const rows = await db.getAllAsync<{
       operation_id: string;
+      type: string;
       payload: string;
       recorded_at: string;
       attempt_count: number;
     }>(
-      `SELECT operation_id, payload, recorded_at, attempt_count FROM offline_outbox WHERE tenant_id = ? AND user_id = ? AND status IN ${statuses}${nextAttemptClause} ORDER BY recorded_at LIMIT 50`,
+      `SELECT operation_id, type, payload, recorded_at, attempt_count FROM offline_outbox WHERE tenant_id = ? AND user_id = ? AND status IN ${statuses}${nextAttemptClause} ORDER BY recorded_at LIMIT 50`,
       ...queryParameters,
     );
     if (rows.length) {
@@ -46,7 +47,7 @@ export async function syncNow(session: Session, options: SyncOptions = {}): Prom
           operations: rows.map((row) => ({
             operation_id: row.operation_id,
             schema_version: 1,
-            type: 'cash_payment',
+            type: row.type,
             payload: JSON.parse(row.payload),
             recorded_at: row.recorded_at,
           })),

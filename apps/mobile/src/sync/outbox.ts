@@ -9,6 +9,34 @@ export type OfflineCashPayment = {
   recordedAt: string;
 };
 
+export type OfflineCollectionDeclaration = {
+  operationId: string;
+  tenantId: string;
+  userId: string;
+  deviceId: string;
+  payload: {
+    visit_id: string;
+    components: { method: 'cash' | 'bank_transfer'; amount: string; reference?: string }[];
+  };
+  recordedAt: string;
+};
+
+export async function queueOfflineCollectionDeclaration(
+  declaration: OfflineCollectionDeclaration,
+): Promise<void> {
+  const database = await initializeDatabase();
+  await database.runAsync(
+    `INSERT INTO offline_outbox (operation_id, tenant_id, user_id, device_id, type, payload, recorded_at, status, attempt_count)
+     VALUES (?, ?, ?, ?, 'collection_declaration', ?, ?, 'pending', 0)`,
+    declaration.operationId,
+    declaration.tenantId,
+    declaration.userId,
+    declaration.deviceId,
+    JSON.stringify(declaration.payload),
+    declaration.recordedAt,
+  );
+}
+
 export async function queueOfflineCashPayment(payment: OfflineCashPayment): Promise<void> {
   const database = await initializeDatabase();
   await database.withTransactionAsync(async () => {

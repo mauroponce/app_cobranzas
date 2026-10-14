@@ -14,9 +14,10 @@ refinanciación, los recuperados, la facturación y las reglas comerciales
 adicionales.
 
 Las entidades existentes de identidad, empresa, clientes, ventas, cuotas y
-cuenta corriente se conservan como soporte interno. No se muestran pantallas ni
-enlaces administrativos ajenos al flujo de cobranzas. La aplicación móvil se
-limita al modo cobrador.
+cuenta corriente se conservan como soporte interno. El dashboard de
+Administración muestra Clientes para consultar la cartera real de la empresa
+activa; no se muestran enlaces administrativos ajenos al flujo de cobranzas.
+La aplicación móvil se limita al modo cobrador.
 
 ## Roles operativos
 

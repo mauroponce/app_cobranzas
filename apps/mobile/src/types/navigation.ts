@@ -7,7 +7,7 @@ export type TabParamList = {
 export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<TabParamList> | undefined;
   VisitDetail: { stopId: string };
-  RegisterPayment: { customerId?: string } | undefined;
+  RegisterPayment: { visitId: string };
   VisitOutcome: { stopId: string };
   Settlement: undefined;
   Notifications: undefined;

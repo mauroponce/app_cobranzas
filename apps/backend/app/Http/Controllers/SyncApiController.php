@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Domain\Collections\CollectionPortfolioService;
 use App\Domain\Collections\PaymentService;
+use App\Domain\Commercial\Decimal;
 use App\Domain\Tenancy\AuthorizationService;
+use App\Models\CollectionRouteStop;
 use App\Models\Customer;
 use App\Models\CustomerAccountEntry;
 use Illuminate\Database\QueryException;
@@ -57,8 +59,25 @@ class SyncApiController extends Controller
         });
         $ids = $customers->pluck('id');
         $entries = CustomerAccountEntry::forTenant($tenant)->whereIn('customer_id', $ids)->where('status', 'open')->orderBy('due_date')->get(['id', 'customer_id', 'sale_id', 'installment_id', 'entry_type', 'outstanding_amount', 'due_date']);
+        $routeStops = CollectionRouteStop::forTenant($tenant)
+            ->where('assigned_collector_membership_id', $membership->id)
+            ->whereHas('route', fn ($query) => $query->where('collector_membership_id', $membership->id)->where('route_date', today($tenant->timezone))->whereIn('status', ['published', 'in_progress']))
+            ->with('customer:id,first_name,last_name')
+            ->orderBy('sequence')
+            ->get(['id', 'customer_id', 'sequence', 'status', 'address_snapshot']);
+        $routeCustomerIds = $routeStops->pluck('customer_id');
+        $routeBalances = CustomerAccountEntry::forTenant($tenant)->whereIn('customer_id', $routeCustomerIds)->where('status', 'open')->selectRaw('customer_id, SUM(outstanding_amount) AS outstanding_amount')->groupBy('customer_id')->pluck('outstanding_amount', 'customer_id');
+        $stops = $routeStops->map(fn (CollectionRouteStop $stop): array => [
+            'id' => $stop->id,
+            'customer_id' => $stop->customer_id,
+            'customer_name' => trim($stop->customer->last_name.', '.$stop->customer->first_name),
+            'sequence' => $stop->sequence,
+            'status' => $stop->status,
+            'address' => trim(implode(', ', array_filter([($stop->address_snapshot['street'] ?? null) ? $stop->address_snapshot['street'].' '.($stop->address_snapshot['street_number'] ?? '') : null, $stop->address_snapshot['city'] ?? null]))),
+            'due_amount_cents' => (string) Decimal::toInteger((string) ($routeBalances[$stop->customer_id] ?? '0.00')),
+        ]);
 
-        return response()->json(['data' => ['customers' => $customers, 'obligations' => $entries, 'cursor' => $cursor + $customers->count(), 'has_more' => $customers->count() === 100, 'reset' => $reset, 'portfolio_version' => $tenant->authorization_version]]);
+        return response()->json(['data' => ['customers' => $customers, 'obligations' => $entries, 'route_stops' => $stops, 'cursor' => $cursor + $customers->count(), 'has_more' => $customers->count() === 100, 'reset' => $reset, 'portfolio_version' => $tenant->authorization_version]]);
     }
 
     private function process($tenant, $actor, object $device, array $operation, PaymentService $payments): array

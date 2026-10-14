@@ -7,6 +7,8 @@ use App\Domain\Collections\PaymentService;
 use App\Domain\Tenancy\AuthorizationManagementService;
 use App\Livewire\CollectionPortfolioManager;
 use App\Livewire\CollectionStructuresManager;
+use App\Models\CollectionRoute;
+use App\Models\CollectionRouteStop;
 use App\Models\CollectionTeam;
 use App\Models\CollectionTeamMember;
 use App\Models\CollectionZone;
@@ -90,6 +92,40 @@ class CollectionPortfolioTest extends TestCase
         $this->withToken($token)->getJson('/api/v1/sync/pull?cursor=0')->assertOk()->assertJsonPath('data.customers.0.id', $customer->id);
         CollectionTeamMember::where('membership_id', $supervisor->id)->update(['left_at' => now()]);
         $this->withToken($token)->getJson('/api/v1/sync/pull?cursor=0')->assertOk()->assertJsonCount(0, 'data.customers');
+    }
+
+    public function test_sync_pull_only_includes_today_route_stops_assigned_to_the_collector(): void
+    {
+        $owner = $this->member('owner');
+        $collector = $this->member('collector', $owner->tenant);
+        $customer = $this->customer($owner);
+        $route = CollectionRoute::create([
+            'tenant_id' => $owner->tenant_id,
+            'route_date' => today(),
+            'collector_membership_id' => $collector->id,
+            'name' => 'Ruta de prueba',
+            'status' => 'published',
+            'created_by_membership_id' => $owner->id,
+            'published_by_membership_id' => $owner->id,
+            'published_at' => now(),
+            'version' => 1,
+        ]);
+        CollectionRouteStop::create([
+            'tenant_id' => $owner->tenant_id,
+            'route_id' => $route->id,
+            'customer_id' => $customer->id,
+            'sequence' => 1,
+            'assigned_collector_membership_id' => $collector->id,
+            'status' => 'pending',
+            'address_snapshot' => ['street' => 'Calle Uno', 'street_number' => '10', 'city' => 'Prueba'],
+        ]);
+
+        $token = $collector->user->createToken('route')->plainTextToken;
+        $this->withToken($token)->postJson('/api/v1/tenant/select', ['tenant_id' => $owner->tenant_id])->assertOk();
+        $this->withToken($token)->getJson('/api/v1/sync/pull?cursor=0')->assertOk()
+            ->assertJsonPath('data.route_stops.0.customer_id', $customer->id)
+            ->assertJsonPath('data.route_stops.0.due_amount_cents', '0');
+
     }
 
     public function test_reassignment_invalidates_cached_portfolio_and_revoked_collection_permission_preserves_sync_for_review(): void

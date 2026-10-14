@@ -48,7 +48,7 @@ La base `app_cobranzas_test` se crea al inicializar el volumen PostgreSQL. Si ya
 
 ## App móvil
 
-Desde `apps/mobile`, ejecutá `npm ci`, copiá `.env.example` a `.env` y luego `npm start`. Para compilar una development build usá `npx expo run:android` o, en macOS, `npx expo run:ios`. La app no depende exclusivamente de Expo Go; SQLite se comprobará en la development build.
+Desde `apps/mobile`, ejecutá `npm ci`, copiá `.env.example` a `.env` y luego `npm start`. Para abrir la app en el navegador, ejecutá `npm run web` y visitá `http://localhost:8081/`. Para compilar una development build usá `npx expo run:android` o, en macOS, `npx expo run:ios`. La app no depende exclusivamente de Expo Go; SQLite se comprobará en la development build.
 
 `EXPO_PUBLIC_API_URL` debe apuntar al backend desde el dispositivo: `http://10.0.2.2:8080` en el emulador Android; `http://localhost:8080` en el simulador iOS; `http://IP_LAN_DEL_EQUIPO:8080` en un dispositivo físico conectado a la misma red. Para dispositivos físicos fuera del entorno local configurá HTTPS y una URL alcanzable. El botón de configuración permite comprobar el healthcheck.
 

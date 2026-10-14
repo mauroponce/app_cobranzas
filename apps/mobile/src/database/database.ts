@@ -13,21 +13,33 @@ export function initializeDatabase(): Promise<SQLite.SQLiteDatabase> {
         device_id TEXT NOT NULL, type TEXT NOT NULL, payload TEXT NOT NULL, recorded_at TEXT NOT NULL,
         status TEXT NOT NULL, attempt_count INTEGER NOT NULL DEFAULT 0, last_error TEXT, synced_at TEXT
       )`);
-      try { await database.execAsync('ALTER TABLE offline_outbox ADD COLUMN next_attempt_at TEXT'); } catch {}
+      try {
+        await database.execAsync('ALTER TABLE offline_outbox ADD COLUMN next_attempt_at TEXT');
+      } catch {}
       await database.execAsync(`CREATE TABLE IF NOT EXISTS authorized_obligations (
         scope_key TEXT NOT NULL, id TEXT NOT NULL, customer_id TEXT NOT NULL, outstanding_amount TEXT NOT NULL,
-        due_date TEXT, PRIMARY KEY (scope_key, id)
+        due_date TEXT, entry_type TEXT, PRIMARY KEY (scope_key, id)
       )`);
+      try {
+        await database.execAsync('ALTER TABLE authorized_obligations ADD COLUMN entry_type TEXT');
+      } catch {}
       await database.execAsync(`CREATE TABLE IF NOT EXISTS authorized_customers (
         scope_key TEXT NOT NULL, id TEXT NOT NULL, name TEXT NOT NULL, status TEXT NOT NULL, updated_at TEXT,
         PRIMARY KEY (scope_key, id)
       )`);
       for (const column of ['collector_name TEXT', 'zone_name TEXT', 'assignment_status TEXT']) {
-        try { await database.execAsync(`ALTER TABLE authorized_customers ADD COLUMN ${column}`); } catch {}
+        try {
+          await database.execAsync(`ALTER TABLE authorized_customers ADD COLUMN ${column}`);
+        } catch {}
       }
       await database.execAsync(`CREATE TABLE IF NOT EXISTS local_payments (
         operation_id TEXT PRIMARY KEY NOT NULL, scope_key TEXT NOT NULL, customer_id TEXT NOT NULL,
         amount TEXT NOT NULL, status TEXT NOT NULL, payment_id TEXT, recorded_at TEXT NOT NULL, result TEXT
+      )`);
+      await database.execAsync(`CREATE TABLE IF NOT EXISTS authorized_route_stops (
+        scope_key TEXT NOT NULL, id TEXT NOT NULL, customer_id TEXT NOT NULL, customer_name TEXT NOT NULL,
+        sequence INTEGER NOT NULL, status TEXT NOT NULL, address TEXT, due_amount_cents TEXT,
+        PRIMARY KEY (scope_key, id)
       )`);
       return database;
     })

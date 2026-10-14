@@ -12,6 +12,9 @@ use App\Http\Controllers\SaleController;
 use App\Http\Controllers\TenantInvitationController;
 use App\Http\Controllers\TenantSelectionController;
 use App\Http\Controllers\TenantUserController;
+use App\Models\CollectionRoute;
+use App\Models\CustomerCollectorAssignment;
+use App\Models\TenantMembership;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 
@@ -110,6 +113,19 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/admin/customers/{customer}/documents', [SaleController::class, 'uploadCustomerDocument'])->name('customers.documents.store');
         Route::get('/admin/late-fee-policies', [SaleController::class, 'policies'])->name('late-fee-policies.index');
         Route::post('/admin/late-fee-policies', [SaleController::class, 'storePolicy'])->name('late-fee-policies.store');
+        Route::get('/modules/collectors', function () {
+            Gate::authorize('routes.view');
+            $tenant = request()->attributes->get('activeTenant');
+            $collectors = TenantMembership::forTenant($tenant)->with('user')->where('status', 'active')->where('role', 'collector')->orderBy('joined_at')->get();
+            $assignments = CustomerCollectorAssignment::forTenant($tenant)->whereNull('unassigned_at')->selectRaw('collector_membership_id, COUNT(*) AS customers_count')->groupBy('collector_membership_id')->pluck('customers_count', 'collector_membership_id');
+            $routes = CollectionRoute::forTenant($tenant)->whereDate('route_date', today($tenant->timezone))->whereIn('status', ['published', 'in_progress'])->selectRaw('collector_membership_id, COUNT(*) AS routes_count')->groupBy('collector_membership_id')->pluck('routes_count', 'collector_membership_id');
+            $collectors->each(function (TenantMembership $collector) use ($assignments, $routes): void {
+                $collector->setAttribute('customers_count', $assignments[$collector->id] ?? 0);
+                $collector->setAttribute('routes_count', $routes[$collector->id] ?? 0);
+            });
+
+            return view('modules.collectors', compact('collectors'));
+        })->name('modules.collectors');
         Route::get('/modules/{section}', function (string $section) {
             $permissions = ['sales' => 'sales.view', 'collections' => 'collections.view', 'routes' => 'routes.view', 'collectors' => 'routes.view', 'settlements' => 'settlements.view', 'reports' => 'reports.view'];
             abort_unless(isset($permissions[$section]), 404);

@@ -103,13 +103,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
           });
       },
       logout: async () => {
-        if (state)
-          await fetch(`${apiBaseUrl}/api/v1/auth/logout`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${state.token}` },
-          });
-        await tokenStorage.deleteItem(tokenKey);
-        setState(null);
+        try {
+          if (state)
+            await fetch(`${apiBaseUrl}/api/v1/auth/logout`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${state.token}` },
+            });
+        } finally {
+          await tokenStorage.deleteItem(tokenKey);
+          setState(null);
+        }
       },
     }),
     [state, ready],

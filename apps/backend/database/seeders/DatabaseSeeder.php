@@ -2,8 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Domain\Tenancy\Audit;
-use App\Models\PlatformAdministrator;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;
@@ -35,14 +33,10 @@ class DatabaseSeeder extends Seeder
         }
 
         $accounts = [
-            ['owner', config('demo.owner_email') ?: 'owner@trotamundos.local', 'Propietario de desarrollo'],
             ['admin', config('demo.admin_email') ?: 'admin@trotamundos.local', 'Administrador de desarrollo'],
-            ['supervisor', 'supervisor@trotamundos.local', 'Supervisor de desarrollo'],
             ['seller', 'seller@trotamundos.local', 'Vendedor de desarrollo'],
             ['collector', 'collector@trotamundos.local', 'Cobrador de desarrollo'],
             ['collector', 'collector.sur@trotamundos.local', 'Cobrador zona sur de desarrollo'],
-            ['logistics', 'logistics@trotamundos.local', 'Logística de desarrollo'],
-            ['viewer', 'viewer@trotamundos.local', 'Consulta de desarrollo'],
         ];
 
         foreach ($accounts as [$role, $email, $name]) {
@@ -56,17 +50,6 @@ class DatabaseSeeder extends Seeder
                 ['tenant_id' => $tenant->id, 'user_id' => $user->id],
                 ['role' => $role, 'status' => 'active', 'joined_at' => now()],
             );
-        }
-
-        $platformUser = User::firstOrCreate(['email' => config('demo.platform_email') ?: 'platform@trotamundos.local'], [
-            'name' => 'Operador de plataforma',
-            'password' => $password,
-            'status' => 'active',
-            'email_verified_at' => now(),
-        ]);
-        $platformAdmin = PlatformAdministrator::firstOrCreate(['user_id' => $platformUser->id]);
-        if ($platformAdmin->wasRecentlyCreated) {
-            Audit::record('platform_admin.granted', $platformAdmin, null);
         }
 
         $this->call([AuthorizationCatalogSeeder::class, CommercialDemoSeeder::class, CollectionsDemoSeeder::class]);

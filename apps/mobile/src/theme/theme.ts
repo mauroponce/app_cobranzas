@@ -1,4 +1,4 @@
-import { MD3DarkTheme, MD3LightTheme, type MD3Theme } from 'react-native-paper';
+import { MD3LightTheme, type MD3Theme } from 'react-native-paper';
 
 // oklch(58.5% 0.233 277.117) converted to sRGB; blue is gamut-clipped.
 export const primaryOklch = 'oklch(58.5% 0.233 277.117)';
@@ -6,7 +6,6 @@ export const palette = {
   primary: '#615FFF',
   onPrimary: '#FFFFFF',
   primarySoft: '#E9E8FF',
-  primaryDarkSoft: '#302D66',
   ink: '#252B42',
   muted: '#737D93',
   background: '#F7F8FC',
@@ -42,23 +41,5 @@ export const lightTheme: MD3Theme = {
     onSurface: palette.ink,
     onSurfaceVariant: palette.muted,
     outline: palette.border,
-  },
-};
-
-export const darkTheme: MD3Theme = {
-  ...MD3DarkTheme,
-  roundness: radii.md,
-  colors: {
-    ...MD3DarkTheme.colors,
-    ...sharedColors,
-    primaryContainer: palette.primaryDarkSoft,
-    onPrimaryContainer: '#E5E4FF',
-    secondary: '#ACB9D2',
-    background: '#151927',
-    surface: '#22283A',
-    surfaceVariant: '#30384D',
-    onSurface: '#F2F4FB',
-    onSurfaceVariant: '#AFB9CB',
-    outline: '#465067',
   },
 };

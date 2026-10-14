@@ -4,6 +4,8 @@ namespace App\Livewire;
 
 use App\Domain\Collections\CollectionRouteService;
 use App\Domain\Collections\PaymentService;
+use App\Domain\Tenancy\LivewireTenantContext;
+use App\Livewire\Concerns\ResolvesTenantContext;
 use App\Models\CollectionDeclaration;
 use App\Models\CollectionIncident;
 use App\Models\CollectionRoute;
@@ -16,6 +18,8 @@ use Livewire\Component;
 
 class CollectionsDashboard extends Component
 {
+    use ResolvesTenantContext { mount as resolveTenantContext; }
+
     public string $activeTab = 'transfers';
     public string $collectorMembershipId = '';
     public string $routeDate = '';
@@ -24,7 +28,9 @@ class CollectionsDashboard extends Component
 
     public function mount(): void
     {
-        $this->routeDate = today(request()->attributes->get('activeTenant')->timezone)->toDateString();
+        $this->resolveTenantContext();
+        $membership = app(LivewireTenantContext::class)->resolve(request(), auth()->user(), $this->tenantId);
+        $this->routeDate = today($membership->tenant->timezone)->toDateString();
     }
 
     public function program(CollectionRouteService $routes): void

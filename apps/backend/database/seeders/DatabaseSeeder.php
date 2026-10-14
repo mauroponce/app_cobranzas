@@ -40,12 +40,14 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($accounts as [$role, $email, $name]) {
-            $user = User::firstOrCreate(['email' => $email], [
+            $user = User::firstOrNew(['email' => $email]);
+            $user->fill([
                 'name' => $name,
                 'password' => $password,
                 'status' => 'active',
                 'email_verified_at' => now(),
             ]);
+            $user->save();
             TenantMembership::firstOrCreate(
                 ['tenant_id' => $tenant->id, 'user_id' => $user->id],
                 ['role' => $role, 'status' => 'active', 'joined_at' => now()],

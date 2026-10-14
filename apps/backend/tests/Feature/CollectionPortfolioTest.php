@@ -8,6 +8,7 @@ use App\Domain\Collections\PaymentService;
 use App\Domain\Tenancy\AuthorizationManagementService;
 use App\Livewire\CollectionPortfolioManager;
 use App\Livewire\CollectionStructuresManager;
+use App\Livewire\CollectionsDashboard;
 use App\Models\CollectionRoute;
 use App\Models\CollectionVisit;
 use App\Models\CollectionTeam;
@@ -152,6 +153,17 @@ class CollectionPortfolioTest extends TestCase
             'status' => 'pending',
             'scheduled_amount' => '10.00',
         ]);
+    }
+
+    public function test_collections_dashboard_rebuilds_the_tenant_context_on_livewire_actions(): void
+    {
+        $owner = $this->member('owner');
+        Livewire::actingAs($owner->user);
+
+        Livewire::test(CollectionsDashboard::class, ['tenantId' => $owner->tenant_id])
+            ->call('showTab', 'routes')
+            ->assertSet('activeTab', 'routes')
+            ->assertSee('Hojas de cobranza');
     }
 
     public function test_reassignment_invalidates_cached_portfolio_and_revoked_collection_permission_preserves_sync_for_review(): void

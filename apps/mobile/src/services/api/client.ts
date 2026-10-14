@@ -1,4 +1,9 @@
-export const apiBaseUrl = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '');
+import { Platform } from 'react-native';
+
+const configuredApiBaseUrl =
+  Platform.OS === 'web' ? process.env.EXPO_PUBLIC_WEB_API_URL : process.env.EXPO_PUBLIC_API_URL;
+
+export const apiBaseUrl = (configuredApiBaseUrl ?? '').replace(/\/$/, '');
 
 export async function apiGet<T>(path: string, token?: string): Promise<T> {
   if (!apiBaseUrl) throw new Error('API URL is not configured');
@@ -13,7 +18,11 @@ export async function apiPost<T>(path: string, body: unknown, token: string): Pr
   if (!apiBaseUrl) throw new Error('API URL is not configured');
   const response = await fetch(`${apiBaseUrl}/api/v1${path}`, {
     method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
     body: JSON.stringify(body),
   });
   if (!response.ok) throw new Error(`API request failed: ${response.status}`);

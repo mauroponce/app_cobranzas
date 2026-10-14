@@ -20,13 +20,9 @@
       "package": "com.anonymous.appcobranzas"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
     },
-    "plugins": [
-      "expo-sqlite",
-      "expo-font",
-      "expo-system-ui",
-      "expo-secure-store"
-    ]
+    "plugins": ["expo-sqlite", "expo-font", "expo-system-ui", "expo-secure-store"]
   }
 }

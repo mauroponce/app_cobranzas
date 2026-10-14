@@ -40,6 +40,7 @@ class DatabaseSeeder extends Seeder
             ['supervisor', 'supervisor@trotamundos.local', 'Supervisor de desarrollo'],
             ['seller', 'seller@trotamundos.local', 'Vendedor de desarrollo'],
             ['collector', 'collector@trotamundos.local', 'Cobrador de desarrollo'],
+            ['collector', 'collector.sur@trotamundos.local', 'Cobrador zona sur de desarrollo'],
             ['logistics', 'logistics@trotamundos.local', 'Logística de desarrollo'],
             ['viewer', 'viewer@trotamundos.local', 'Consulta de desarrollo'],
         ];
@@ -68,6 +69,6 @@ class DatabaseSeeder extends Seeder
             Audit::record('platform_admin.granted', $platformAdmin, null);
         }
 
-        $this->call([AuthorizationCatalogSeeder::class, CommercialDemoSeeder::class]);
+        $this->call([AuthorizationCatalogSeeder::class, CommercialDemoSeeder::class, CollectionsDemoSeeder::class]);
     }
 }

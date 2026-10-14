@@ -12,7 +12,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { initializeDatabase } from './src/database/database';
+import { WelcomeScreen } from './src/app/WelcomeScreen';
 import { RoutesScreen } from './src/features/routes/RoutesScreen';
+import { CustomersScreen } from './src/features/customers/CustomersScreen';
+import { CustomerDetailScreen } from './src/features/customers/CustomerDetailScreen';
 import { CollectionsScreen } from './src/features/collections/CollectionsScreen';
 import { RegisterPaymentScreen } from './src/features/collections/RegisterPaymentScreen';
 import { SettlementScreen } from './src/features/collections/SettlementScreen';
@@ -51,7 +54,9 @@ function MainTabs() {
         },
         tabBarIcon: ({ color }) => {
           const icons = {
+            Home: 'home-variant-outline',
             Route: 'map-marker-path',
+            Customers: 'account-group-outline',
             Collections: 'wallet-outline',
             Profile: 'account-outline',
           } as const;
@@ -66,8 +71,12 @@ function MainTabs() {
         },
       })}
     >
+      <Tabs.Screen name="Home" component={WelcomeScreen} options={{ title: 'Inicio' }} />
       {state?.capabilities.permissions['routes.view'] ? (
         <Tabs.Screen name="Route" component={RoutesScreen} options={{ title: 'Ruta' }} />
+      ) : null}
+      {state?.capabilities.permissions['customers.view'] ? (
+        <Tabs.Screen name="Customers" component={CustomersScreen} options={{ title: 'Clientes' }} />
       ) : null}
       {state?.capabilities.permissions['payments.view'] ? (
         <Tabs.Screen
@@ -125,6 +134,7 @@ function AppNavigation() {
       <StatusBar style="dark" />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="MainTabs" component={MainTabs} />
+        <Stack.Screen name="CustomerDetail" component={CustomerDetailScreen} />
         <Stack.Screen name="VisitDetail" component={VisitDetailScreen} />
         <Stack.Screen name="RegisterPayment" component={RegisterPaymentScreen} />
         <Stack.Screen name="VisitOutcome" component={VisitOutcomeScreen} />

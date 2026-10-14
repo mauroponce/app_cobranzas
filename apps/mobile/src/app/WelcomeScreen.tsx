@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useFocusEffect, useNavigation, type NavigationProp } from '@react-navigation/native';
-import { Button, useTheme } from 'react-native-paper';
+import { Button } from 'react-native-paper';
 import { useAuth } from '../auth/AuthContext';
 import { AppHeader } from '../components/AppHeader';
 import { BalanceCard } from '../components/BalanceCard';
@@ -11,52 +11,71 @@ import { RouteStopCard } from '../components/RouteStopCard';
 import { Screen } from '../components/Screen';
 import { SectionTitle } from '../components/SectionTitle';
 import { formatDate } from '../data/collectorData';
-import { routeStops, scopeKey, type LocalRouteStop } from '../database/financial';
-import { syncNow } from '../sync/worker';
+import { pendingCount, routeStops, scopeKey, type LocalRouteStop } from '../database/financial';
 import { spacing } from '../theme/theme';
 import type { RootStackParamList } from '../types/navigation';
 
 export function WelcomeScreen() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { state } = useAuth();
-  const theme = useTheme();
   const [stops, setStops] = useState<LocalRouteStop[]>([]);
+  const [pendingSync, setPendingSync] = useState(0);
   const load = useCallback(() => {
-    if (state)
-      routeStops(scopeKey(state.capabilities.tenant.id, state.capabilities.user.id)).then(setStops);
+    if (!state) return;
+    const scope = scopeKey(state.capabilities.tenant.id, state.capabilities.user.id);
+    Promise.all([routeStops(scope), pendingCount(scope)])
+      .then(([nextStops, nextPendingSync]) => {
+        setStops(nextStops);
+        setPendingSync(nextPendingSync);
+      })
+      .catch(() => {
+        setStops([]);
+        setPendingSync(0);
+      });
   }, [state]);
   useEffect(load, [load]);
   useFocusEffect(load);
-  useEffect(() => {
-    if (!state) return;
-    syncNow({
-      token: state.token,
-      deviceId: state.deviceId,
-      tenantId: state.capabilities.tenant.id,
-      userId: state.capabilities.user.id,
-    })
-      .then(load)
-      .catch(() => {});
-  }, [load, state]);
   const completed = stops.filter((stop) => stop.status === 'visited').length;
   const pending = stops.filter((stop) => stop.status === 'pending').length;
+  const progress = stops.length ? `${completed} de ${stops.length}` : '—';
   return (
     <Screen>
       <AppHeader
         eyebrow={formatDate(new Date())}
-        title="Buen día"
+        title={`Hola${state?.capabilities.user.name ? `, ${state.capabilities.user.name}` : ''}`}
         subtitle="Tu jornada de cobranza"
         onNotifications={() => navigation.navigate('Notifications')}
       />
-      <BalanceCard label="Recaudación de hoy" amount="$ 0,00" footer="Sin cobros registrados hoy" />
+      <BalanceCard
+        label="Jornada de hoy"
+        amount={progress}
+        footer={stops.length ? 'Visitas realizadas' : 'Todavía no hay visitas asignadas'}
+        icon="map-marker-path"
+      />
       <View style={styles.grid}>
         <View style={styles.row}>
-          <MetricCard icon="map-marker-path" value={String(stops.length)} label="Visitas del día" />
-          <MetricCard icon="check-circle-outline" value={String(completed)} label="Completadas" />
+          <MetricCard
+            icon="map-marker-path"
+            value={stops.length ? String(stops.length) : '—'}
+            label="Visitas del día"
+          />
+          <MetricCard
+            icon="check-circle-outline"
+            value={stops.length ? String(completed) : '—'}
+            label="Realizadas"
+          />
         </View>
         <View style={styles.row}>
-          <MetricCard icon="cash" value="$ 0" label="Efectivo cobrado" />
-          <MetricCard icon="clock-outline" value={String(pending)} label="Pendientes" />
+          <MetricCard
+            icon="clock-outline"
+            value={stops.length ? String(pending) : '—'}
+            label="Por visitar"
+          />
+          <MetricCard
+            icon="cloud-upload-outline"
+            value={String(pendingSync)}
+            label="Sin sincronizar"
+          />
         </View>
       </View>
       <SectionTitle
@@ -65,24 +84,22 @@ export function WelcomeScreen() {
         onAction={() => navigation.navigate('MainTabs', { screen: 'Route' })}
       />
       {stops.length ? (
-        stops
-          .slice(0, 2)
-          .map((stop) => (
-            <RouteStopCard
-              key={stop.id}
-              stop={{
-                id: stop.id,
-                order: stop.sequence,
-                customerId: stop.customer_id,
-                customerName: stop.customer_name,
-                address: stop.address ?? 'Dirección sin detalle',
-                dueMinor: stop.due_amount_cents,
-                status: stop.status === 'visited' ? 'completed' : 'pending',
-                onlinePaymentConfirmed: false,
-              }}
-              onPress={() => navigation.navigate('VisitDetail', { stopId: stop.id })}
-            />
-          ))
+        stops.slice(0, 2).map((stop) => (
+          <RouteStopCard
+            key={stop.id}
+            stop={{
+              id: stop.id,
+              order: stop.sequence,
+              customerId: stop.customer_id,
+              customerName: stop.customer_name,
+              address: stop.address ?? 'Dirección sin detalle',
+              dueMinor: stop.due_amount_cents,
+              status: stop.status === 'visited' ? 'completed' : 'pending',
+              onlinePaymentConfirmed: false,
+            }}
+            onPress={() => navigation.navigate('VisitDetail', { stopId: stop.id })}
+          />
+        ))
       ) : (
         <EmptyState
           icon="map-marker-outline"
@@ -90,11 +107,7 @@ export function WelcomeScreen() {
           description="Sincronizaremos las paradas asignadas cuando tengas conexión."
         />
       )}
-      <Button
-        mode="outlined"
-        onPress={() => navigation.navigate('MainTabs', { screen: 'Route' })}
-        textColor={theme.colors.primary}
-      >
+      <Button mode="outlined" onPress={() => navigation.navigate('MainTabs', { screen: 'Route' })}>
         Abrir mi ruta
       </Button>
     </Screen>

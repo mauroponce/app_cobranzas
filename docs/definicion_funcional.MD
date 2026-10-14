@@ -27,6 +27,12 @@ incidencias. El dashboard administrativo y la aplicación móvil del cobrador
 solo muestran acciones necesarias para este flujo. El cobrador inicia su hoja y
 registra sus visitas y declaraciones de cobro desde la aplicación móvil.
 
+La aplicación móvil del cobrador dispone de Inicio, Ruta, Clientes, Cobros y
+Perfil. Inicio resume únicamente las visitas asignadas y las operaciones locales
+pendientes de sincronización; no presenta metas ni importes ficticios. Clientes
+permite consultar la cartera autorizada sincronizada y sus obligaciones; el
+registro de un cobro se inicia desde una visita asignada.
+
 ## Hojas y visitas
 
 - Una hoja tiene un único cobrador.

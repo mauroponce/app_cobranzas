@@ -64,19 +64,19 @@ class CollectionsDashboard extends Component
         $membership = request()->attributes->get('activeMembership');
         Gate::authorize('payments.view');
         $tenantId = $membership->tenant_id;
-        $transferDeclarations = CollectionDeclaration::forTenant($tenantId)->whereHas('components', fn ($query) => $query->where('method', 'bank_transfer'));
-        $pendingTransfers = (clone $transferDeclarations)->where('status', 'pending')->count();
+        $declarations = CollectionDeclaration::forTenant($tenantId);
+        $pendingDeclarations = (clone $declarations)->where('status', 'pending')->count();
         $routes = CollectionRoute::forTenant($tenantId)->with(['collectorMembership.user'])->withCount('visits')->latest('route_date')->limit(20)->get();
         $openIncidents = CollectionIncident::forTenant($tenantId)->where('status', 'open')->count();
 
         return view('livewire.collections-dashboard', [
-            'declarations' => $transferDeclarations->with(['customer', 'components', 'visit.sale'])->latest('declared_at')->paginate(20),
+            'declarations' => $declarations->with(['customer', 'components', 'visit.sale'])->latest('declared_at')->paginate(20),
             'collectors' => TenantMembership::forTenant($membership->tenant_id)->with('user')->where('role', 'collector')->where('status', 'active')->orderBy('joined_at')->get(),
             'sales' => Sale::forTenant($membership->tenant_id)->with('customer')->where('status', 'confirmed')->latest('confirmed_at')->limit(100)->get(),
             'routes' => $routes,
             'incidents' => CollectionIncident::forTenant($tenantId)->latest()->limit(20)->get(),
             'activity' => AuditEvent::query()->where('tenant_id', $tenantId)->with('actor')->latest()->limit(20)->get(),
-            'metrics' => ['pending_transfers' => $pendingTransfers, 'routes_in_progress' => $routes->where('status', 'in_progress')->count(), 'published_routes' => $routes->where('status', 'published')->count(), 'open_incidents' => $openIncidents],
+            'metrics' => ['pending_declarations' => $pendingDeclarations, 'routes_in_progress' => $routes->where('status', 'in_progress')->count(), 'published_routes' => $routes->where('status', 'published')->count(), 'open_incidents' => $openIncidents],
         ]);
     }
 }

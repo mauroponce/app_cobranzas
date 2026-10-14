@@ -33,6 +33,11 @@ pendientes de sincronización; no presenta metas ni importes ficticios. Clientes
 permite consultar la cartera autorizada sincronizada y sus obligaciones; el
 registro de un cobro se inicia desde una visita asignada.
 
+El panel administrativo lista todas las declaraciones de cobro. Las nuevas
+declaraciones aceptadas desde la sincronización móvil actualizan esa tabla en
+vivo mediante Server-Sent Events; el evento no expone datos financieros y solo
+invalida la vista de la empresa activa.
+
 ## Hojas y visitas
 
 - Una hoja tiene un único cobrador.

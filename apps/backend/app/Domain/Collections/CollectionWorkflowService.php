@@ -46,6 +46,9 @@ final class CollectionWorkflowService
                 foreach ($data['components'] as $component) CollectionDeclarationComponent::create(['tenant_id' => $tenant->id, 'declaration_id' => $declaration->id, 'method' => $component['method'], 'amount' => Decimal::format(Decimal::toInteger($component['amount'])), 'reference' => $component['reference'] ?? null]);
                 $visit->update(['status' => 'recorded', 'outcome' => 'paid', 'recorded_at' => $data['declared_at'] ?? now(), 'received_at' => now()]);
                 Audit::record('collection_declaration.created', $declaration, $actor, $tenant->id);
+                DB::afterCommit(
+                    fn () => app(CollectionDashboardNotifier::class)->notify($tenant->id),
+                );
             }
             return $declaration;
         });

@@ -1,5 +1,5 @@
 import { initializeDatabase } from '../database/database';
-import { queueOfflineCashPayment } from './outbox';
+import { queueOfflineCashPayment, queueOfflineCollectionDeclaration } from './outbox';
 import { resetSqliteMock, sqliteRows } from '../../test/sqliteMock';
 
 const payment = (overrides = {}) => ({
@@ -15,6 +15,31 @@ describe('offline cash outbox', () => {
     const rows = sqliteRows();
     expect(rows.outbox.get('operation-1')).toMatchObject({ tenant_id: 'tenant-a', user_id: 'user-a', device_id: 'device-a', payload: expect.stringContaining('125.50'), status: 'pending' });
     expect(rows.payments.get('operation-1')).toMatchObject({ scope_key: 'tenant-a:user-a', amount: '125.50', status: 'pending_sync' });
+  });
+
+  it('stores a collection declaration in the outbox and visible local history', async () => {
+    await queueOfflineCollectionDeclaration({
+      operationId: 'declaration-1',
+      tenantId: 'tenant-a',
+      userId: 'user-a',
+      deviceId: 'device-a',
+      customerId: 'customer-a',
+      recordedAt: '2026-10-12T00:00:00.000Z',
+      payload: {
+        visit_id: 'visit-a',
+        components: [{ method: 'bank_transfer', amount: '125.50', reference: 'DEMO-1' }],
+      },
+    });
+
+    expect(sqliteRows().outbox.get('declaration-1')).toMatchObject({
+      type: 'collection_declaration',
+      status: 'pending',
+    });
+    expect(sqliteRows().payments.get('declaration-1')).toMatchObject({
+      customer_id: 'customer-a',
+      amount: '125.50',
+      status: 'pending',
+    });
   });
 
   it('rolls back the outbox insert when the local payment write fails', async () => {

@@ -35,7 +35,7 @@ export function WelcomeScreen() {
   }, [state]);
   useEffect(load, [load]);
   useFocusEffect(load);
-  const completed = stops.filter((stop) => stop.status === 'visited').length;
+  const completed = stops.filter((stop) => stop.status === 'recorded').length;
   const pending = stops.filter((stop) => stop.status === 'pending').length;
   const progress = stops.length ? `${completed} de ${stops.length}` : '—';
   return (
@@ -94,7 +94,7 @@ export function WelcomeScreen() {
               customerName: stop.customer_name,
               address: stop.address ?? 'Dirección sin detalle',
               dueMinor: stop.due_amount_cents,
-              status: stop.status === 'visited' ? 'completed' : 'pending',
+              status: stop.status === 'recorded' ? 'completed' : 'pending',
               onlinePaymentConfirmed: false,
             }}
             onPress={() => navigation.navigate('VisitDetail', { stopId: stop.id })}

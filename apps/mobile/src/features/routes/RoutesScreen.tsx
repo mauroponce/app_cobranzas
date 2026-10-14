@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useNavigation, type NavigationProp } from '@react-navigation/native';
-import { Text } from 'react-native-paper';
+import { Button, Text } from 'react-native-paper';
 import { AppHeader } from '../../components/AppHeader';
 import { EmptyState } from '../../components/EmptyState';
 import { ListScreen } from '../../components/Screen';
@@ -9,7 +9,8 @@ import { RouteStopCard } from '../../components/RouteStopCard';
 import { StatusBadge } from '../../components/StatusBadge';
 import { formatDate } from '../../data/collectorData';
 import { useAuth } from '../../auth/AuthContext';
-import { routeStops, scopeKey, type LocalRouteStop } from '../../database/financial';
+import { route, routeStops, scopeKey, type LocalRoute, type LocalRouteStop } from '../../database/financial';
+import { apiPost } from '../../services/api/client';
 import { syncNow } from '../../sync/worker';
 import { spacing } from '../../theme/theme';
 import type { RootStackParamList } from '../../types/navigation';
@@ -17,9 +18,13 @@ export function RoutesScreen() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { state } = useAuth();
   const [stops, setStops] = useState<LocalRouteStop[]>([]);
+  const [activeRoute, setActiveRoute] = useState<LocalRoute | null>(null);
+  const [starting, setStarting] = useState(false);
   const load = useCallback(() => {
-    if (state)
-      routeStops(scopeKey(state.capabilities.tenant.id, state.capabilities.user.id)).then(setStops);
+    if (!state) return;
+    const scope = scopeKey(state.capabilities.tenant.id, state.capabilities.user.id);
+    routeStops(scope).then(setStops);
+    route(scope).then(setActiveRoute);
   }, [state]);
   useEffect(load, [load]);
   useFocusEffect(load);
@@ -34,6 +39,22 @@ export function RoutesScreen() {
         .then(load)
         .catch(() => {});
   }, [state, load]);
+  const startRoute = async () => {
+    if (!state || !activeRoute || activeRoute.status !== 'published') return;
+    setStarting(true);
+    try {
+      await apiPost(`/collection-routes/${activeRoute.id}/start`, {}, state.token);
+      await syncNow({
+        token: state.token,
+        deviceId: state.deviceId,
+        tenantId: state.capabilities.tenant.id,
+        userId: state.capabilities.user.id,
+      }, { force: true });
+      load();
+    } finally {
+      setStarting(false);
+    }
+  };
   return (
     <ListScreen>
       <FlatList
@@ -54,11 +75,19 @@ export function RoutesScreen() {
               </Text>
               <Text variant="bodyMedium">
                 Visitas: {stops.length || '—'} · Realizadas:{' '}
-                {stops.length ? stops.filter((stop) => stop.status === 'visited').length : '—'} ·
+                {stops.length ? stops.filter((stop) => stop.status === 'recorded').length : '—'} ·
                 Pendientes:{' '}
                 {stops.length ? stops.filter((stop) => stop.status === 'pending').length : '—'}
               </Text>
-              <StatusBadge label="Pendientes de asignación" />
+              {activeRoute?.status === 'published' ? (
+                <Button mode="contained" loading={starting} onPress={startRoute}>
+                  Iniciar hoja
+                </Button>
+              ) : activeRoute?.status === 'in_progress' ? (
+                <StatusBadge label="Hoja en curso" kind="success" />
+              ) : (
+                <StatusBadge label="Sin hoja disponible" />
+              )}
             </View>
             <Text variant="titleMedium" style={styles.title}>
               Paradas de hoy
@@ -74,7 +103,7 @@ export function RoutesScreen() {
               customerName: item.customer_name,
               address: item.address ?? 'Dirección sin detalle',
               dueMinor: item.due_amount_cents,
-              status: item.status === 'visited' ? 'completed' : 'pending',
+              status: item.status === 'recorded' ? 'completed' : 'pending',
               onlinePaymentConfirmed: false,
             }}
             onPress={() => navigation.navigate('VisitDetail', { stopId: item.id })}

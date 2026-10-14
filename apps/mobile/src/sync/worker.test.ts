@@ -1,5 +1,6 @@
 import { getMetadata } from '../database/database';
-import { queueOfflineCashPayment } from './outbox';
+import { syncInfo } from '../database/financial';
+import { queueOfflineCashPayment, queueOfflineCollectionDeclaration } from './outbox';
 import { syncNow } from './worker';
 import { apiGet, apiPost } from '../services/api/client';
 import { resetSqliteMock, sqliteRows } from '../../test/sqliteMock';
@@ -8,7 +9,7 @@ jest.mock('../services/api/client', () => ({ apiGet: jest.fn(), apiPost: jest.fn
 
 const mockedGet = jest.mocked(apiGet); const mockedPost = jest.mocked(apiPost);
 const session = { token: 'token', deviceId: 'device-a', tenantId: 'tenant-a', userId: 'user-a' };
-const pull = (cursor = 1, hasMore = false) => ({ data: { customers: [{ id: `customer-${cursor}`, first_name: 'Ana', last_name: 'Pérez', status: 'active', updated_at: '2026-10-12T00:00:00Z' }], obligations: [{ id: `entry-${cursor}`, customer_id: `customer-${cursor}`, outstanding_amount: '100.00', due_date: null, entry_type: 'installment' }], cursor, has_more: hasMore } });
+const pull = (cursor = 1, hasMore = false) => ({ data: { customers: [{ id: `customer-${cursor}`, first_name: 'Ana', last_name: 'Pérez', status: 'active', updated_at: '2026-10-12T00:00:00Z' }], obligations: [{ id: `entry-${cursor}`, customer_id: `customer-${cursor}`, outstanding_amount: '100.00', due_date: null, entry_type: 'installment' }], route: { id: 'route-1', status: 'published', route_date: '2026-10-12' }, cursor, has_more: hasMore } });
 async function enqueue(id = 'operation-1'): Promise<void> { await queueOfflineCashPayment({ operationId: id, tenantId: session.tenantId, userId: session.userId, deviceId: session.deviceId, recordedAt: '2026-10-12T00:00:00.000Z', payload: { customer_id: 'customer-1', amount: '100.00', received_at: '2026-10-12T00:00:00.000Z' } }); }
 
 describe('sync worker', () => {
@@ -24,6 +25,20 @@ describe('sync worker', () => {
     expect(sqliteRows().payments.get('operation-1')).toMatchObject({ status: 'confirmed', payment_id: 'payment-1' });
     expect(await getMetadata('sync:cursor:tenant-a:user-a')).toBe('1');
     expect(await getMetadata('sync:last_success:tenant-a:user-a')).toEqual(expect.any(String));
+    expect(sqliteRows().routes.get('tenant-a:user-a')).toMatchObject({ id: 'route-1', status: 'published' });
+  });
+
+  it('keeps a synced collection declaration visible as pending review', async () => {
+    await queueOfflineCollectionDeclaration({ operationId: 'declaration-1', tenantId: session.tenantId, userId: session.userId, deviceId: session.deviceId, customerId: 'customer-1', recordedAt: '2026-10-12T00:00:00.000Z', payload: { visit_id: 'visit-1', components: [{ method: 'cash', amount: '100.00' }] } });
+    mockedPost.mockResolvedValue({ data: { operations: [{ operation_id: 'declaration-1', status: 'pending_review', declaration_id: 'declaration-server-1' }] } });
+    mockedGet.mockResolvedValue(pull());
+
+    await syncNow(session);
+
+    expect(sqliteRows().payments.get('declaration-1')).toMatchObject({
+      status: 'pending_review',
+      payment_id: 'declaration-server-1',
+    });
   });
 
   it('continues paginated pull from the persisted cursor', async () => {
@@ -41,6 +56,10 @@ describe('sync worker', () => {
     expect(new Date(String(row?.next_attempt_at)).getTime() - Date.now()).toBeGreaterThanOrEqual(1900);
     expect(new Date(String(row?.next_attempt_at)).getTime() - Date.now()).toBeLessThanOrEqual(2000);
     expect(await getMetadata('sync:last_success:tenant-a:user-a')).toBeNull();
+    expect(await syncInfo('tenant-a:user-a')).toEqual({
+      lastSuccess: null,
+      lastError: 'timeout',
+    });
   });
 
   it.each(['401', '403'])('blocks automatic synchronization on HTTP %s without rejecting the financial operation', async (status) => {

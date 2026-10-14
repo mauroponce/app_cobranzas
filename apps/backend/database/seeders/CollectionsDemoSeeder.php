@@ -4,15 +4,17 @@ namespace Database\Seeders;
 
 use App\Domain\Collections\CollectionAssignmentService;
 use App\Domain\Collections\PaymentService;
+use App\Domain\Commercial\Decimal;
 use App\Domain\Commercial\QuotationService;
 use App\Domain\Sales\ConfirmSaleAction;
 use App\Domain\Sales\SaleApplicationService;
 use App\Models\CollectionRoute;
-use App\Models\CollectionRouteStop;
 use App\Models\CollectionTeam;
 use App\Models\CollectionTeamMember;
+use App\Models\CollectionVisit;
 use App\Models\CollectionZone;
 use App\Models\Customer;
+use App\Models\CustomerAccountEntry;
 use App\Models\CustomerCollectionZoneAssignment;
 use App\Models\Payment;
 use App\Models\PriceList;
@@ -65,7 +67,7 @@ class CollectionsDemoSeeder extends Seeder
         $anaSale = $this->confirmedCashSale($anaQuote, $seller, $admin);
         $this->payment($tenant, $firstCollector, $customers['DEMO002'], $brunoSale, '150000.00', 'DEMO: cobro parcial de Bruno');
         $this->payment($tenant, $firstCollector, $customers['DEMO001'], $anaSale, '200000.00', 'DEMO: cobro parcial de Ana');
-        $this->routes($tenant, $adminMembership, $firstCollectorMembership, $secondCollectorMembership, $customers, $zones);
+        $this->routes($tenant, $adminMembership, $firstCollectorMembership, $secondCollectorMembership, $brunoSale, $anaSale, $zones);
     }
 
     private function membership(Tenant $tenant, User $user): ?TenantMembership
@@ -176,7 +178,7 @@ class CollectionsDemoSeeder extends Seeder
         ]);
     }
 
-    private function routes(Tenant $tenant, TenantMembership $admin, TenantMembership $firstCollector, TenantMembership $secondCollector, $customers, array $zones): void
+    private function routes(Tenant $tenant, TenantMembership $admin, TenantMembership $firstCollector, TenantMembership $secondCollector, Sale $brunoSale, Sale $anaSale, array $zones): void
     {
         $date = now()->toDateString();
         $north = CollectionRoute::firstOrCreate([
@@ -186,7 +188,7 @@ class CollectionsDemoSeeder extends Seeder
             'name' => 'DEMO: ruta norte',
         ], [
             'zone_id' => $zones['north']->id,
-            'description' => 'DEMO: visitas de cobranza de Ana y Bruno',
+            'description' => 'DEMO: hoja publicada para iniciar desde Expo con collector@trotamundos.local y registrar una declaración.',
             'status' => CollectionRoute::PUBLISHED,
             'created_by_membership_id' => $admin->id,
             'published_by_membership_id' => $admin->id,
@@ -200,32 +202,44 @@ class CollectionsDemoSeeder extends Seeder
             'name' => 'DEMO: ruta sur',
         ], [
             'zone_id' => $zones['south']->id,
-            'description' => 'DEMO: visita de cobranza de Carla',
+            'description' => 'DEMO: hoja publicada para el cobrador de zona sur.',
             'status' => CollectionRoute::PUBLISHED,
             'created_by_membership_id' => $admin->id,
             'published_by_membership_id' => $admin->id,
             'published_at' => now(),
             'version' => 1,
         ]);
-        $this->stops($north, $firstCollector, [$customers['DEMO001'], $customers['DEMO002']]);
-        $this->stops($south, $secondCollector, [$customers['DEMO003']]);
+        $this->visits($north, [$anaSale, $brunoSale]);
     }
 
-    private function stops(CollectionRoute $route, TenantMembership $collector, array $customers): void
+    /** @param list<Sale> $sales */
+    private function visits(CollectionRoute $route, array $sales): void
     {
-        foreach ($customers as $index => $customer) {
-            $address = $customer->addresses()->where('is_primary', true)->first();
-            CollectionRouteStop::updateOrCreate([
+        foreach ($sales as $index => $sale) {
+            $entries = CustomerAccountEntry::forTenant($route->tenant_id)
+                ->where('sale_id', $sale->id)
+                ->where('status', 'open')
+                ->where('outstanding_amount', '>', 0)
+                ->orderBy('due_date')
+                ->get();
+
+            CollectionVisit::firstOrCreate([
                 'tenant_id' => $route->tenant_id,
                 'route_id' => $route->id,
-                'customer_id' => $customer->id,
+                'sale_id' => $sale->id,
             ], [
-                'customer_address_id' => $address?->id,
+                'customer_id' => $sale->customer_id,
                 'sequence' => $index + 1,
-                'assigned_collector_membership_id' => $collector->id,
                 'status' => 'pending',
-                'planned_notes' => 'DEMO: visita programada',
-                'address_snapshot' => $address ? $address->only(['label', 'street', 'street_number', 'city', 'province']) : null,
+                'scheduled_amount' => Decimal::format(
+                    $entries->sum(fn (CustomerAccountEntry $entry) => Decimal::toInteger($entry->outstanding_amount)),
+                ),
+                'obligation_snapshot' => $entries->map(fn (CustomerAccountEntry $entry): array => [
+                    'account_entry_id' => $entry->id,
+                    'installment_id' => $entry->installment_id,
+                    'outstanding_amount' => $entry->outstanding_amount,
+                    'due_date' => $entry->due_date?->toDateString(),
+                ])->all(),
             ]);
         }
     }

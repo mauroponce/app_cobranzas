@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import * as Network from 'expo-network';
 import {
@@ -7,7 +7,7 @@ import {
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { PaperProvider, useTheme } from 'react-native-paper';
+import { PaperProvider, Snackbar, useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -94,15 +94,28 @@ function AppNavigation() {
   const { state, ready } = useAuth();
   const theme = useTheme();
   const navTheme = NavigationLightTheme;
+  const [syncError, setSyncError] = useState<string | null>(null);
   useEffect(() => {
-    if (!state) return undefined;
-    const run = () =>
-      syncNow({
-        token: state.token,
-        deviceId: state.deviceId,
-        tenantId: state.capabilities.tenant.id,
-        userId: state.capabilities.user.id,
-      }).catch(() => {});
+    if (!state) {
+      return undefined;
+    }
+
+    let active = true;
+    const run = async () => {
+      try {
+        await syncNow({
+          token: state.token,
+          deviceId: state.deviceId,
+          tenantId: state.capabilities.tenant.id,
+          userId: state.capabilities.user.id,
+        });
+        if (active) setSyncError(null);
+      } catch (error: unknown) {
+        if (!active) return;
+        const detail = error instanceof Error ? error.message : 'Error desconocido';
+        setSyncError(`No se pudo sincronizar: ${detail}`);
+      }
+    };
     run();
     const network = Network.addNetworkStateListener((event) => {
       if (event.isConnected && event.isInternetReachable !== false) run();
@@ -111,6 +124,7 @@ function AppNavigation() {
       if (next === 'active') run();
     });
     return () => {
+      active = false;
       network.remove();
       appState.remove();
     };
@@ -118,30 +132,39 @@ function AppNavigation() {
   if (!ready) return null;
   if (!state) return <LoginScreen />;
   return (
-    <NavigationContainer
-      theme={{
-        ...navTheme,
-        colors: {
-          ...navTheme.colors,
-          primary: theme.colors.primary,
-          background: theme.colors.background,
-          card: theme.colors.surface,
-          text: theme.colors.onSurface,
-          border: theme.colors.outline,
-        },
-      }}
-    >
-      <StatusBar style="dark" />
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="MainTabs" component={MainTabs} />
-        <Stack.Screen name="CustomerDetail" component={CustomerDetailScreen} />
-        <Stack.Screen name="VisitDetail" component={VisitDetailScreen} />
-        <Stack.Screen name="RegisterPayment" component={RegisterPaymentScreen} />
-        <Stack.Screen name="VisitOutcome" component={VisitOutcomeScreen} />
-        <Stack.Screen name="Settlement" component={SettlementScreen} />
-        <Stack.Screen name="Notifications" component={NotificationsScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <>
+      <NavigationContainer
+        theme={{
+          ...navTheme,
+          colors: {
+            ...navTheme.colors,
+            primary: theme.colors.primary,
+            background: theme.colors.background,
+            card: theme.colors.surface,
+            text: theme.colors.onSurface,
+            border: theme.colors.outline,
+          },
+        }}
+      >
+        <StatusBar style="dark" />
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="MainTabs" component={MainTabs} />
+          <Stack.Screen name="CustomerDetail" component={CustomerDetailScreen} />
+          <Stack.Screen name="VisitDetail" component={VisitDetailScreen} />
+          <Stack.Screen name="RegisterPayment" component={RegisterPaymentScreen} />
+          <Stack.Screen name="VisitOutcome" component={VisitOutcomeScreen} />
+          <Stack.Screen name="Settlement" component={SettlementScreen} />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+      <Snackbar
+        visible={syncError !== null}
+        onDismiss={() => setSyncError(null)}
+        duration={10000}
+      >
+        {syncError}
+      </Snackbar>
+    </>
   );
 }
 export default function App() {

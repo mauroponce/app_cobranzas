@@ -41,6 +41,9 @@ export function initializeDatabase(): Promise<SQLite.SQLiteDatabase> {
         sequence INTEGER NOT NULL, status TEXT NOT NULL, address TEXT, due_amount_cents TEXT,
         PRIMARY KEY (scope_key, id)
       )`);
+      await database.execAsync(`CREATE TABLE IF NOT EXISTS authorized_routes (
+        scope_key TEXT PRIMARY KEY NOT NULL, id TEXT NOT NULL, status TEXT NOT NULL, route_date TEXT NOT NULL
+      )`);
       return database;
     })
     .catch((error: unknown) => {

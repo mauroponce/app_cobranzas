@@ -29,3 +29,9 @@ Las colecciones responden con `data` y `meta.current_page`/`meta.last_page`. Los
 `GET /api/v1/collection-portfolio` consulta la cartera efectiva. La administración usa `POST` y `DELETE` sobre `/customers/{id}/collector-assignment`, y los recursos `/collection-zones` y `/collection-teams`. Todos requieren empresa seleccionada y verifican capacidades en servidor.
 
 `GET /api/v1/sync/pull?cursor=&portfolio_version=` devuelve solo clientes cobrables autorizados. Si cambia la cartera, responde `reset: true`, reinicia el cursor y entrega `portfolio_version`; el cliente debe eliminar la caché autorizada anterior antes de almacenar la página recibida. Las operaciones de salida no se eliminan por esa invalidación.
+
+El mismo `pull` incluye `route`, con `id`, `status` y `route_date` de la hoja de
+la fecha actual del cobrador, o `null` cuando no existe. Las paradas continúan
+en `route_stops`. El cliente puede iniciar una hoja publicada mediante
+`POST /api/v1/collection-routes/{id}/start` antes de enviar una operación
+`collection_declaration` por `POST /api/v1/sync/push`.

@@ -4,16 +4,26 @@ import { scopeKey } from '../database/financial';
 
 type Session = { token: string; deviceId: string; tenantId: string; userId: string };
 type SyncOptions = { force?: boolean };
-let running = false;
+let running: Promise<void> | undefined;
+
 export async function syncNow(session: Session, options: SyncOptions = {}): Promise<void> {
-  if (running) return;
-  running = true;
+  if (running) return running;
+
+  running = runSync(session, options);
+  try {
+    await running;
+  } finally {
+    running = undefined;
+  }
+}
+
+async function runSync(session: Session, options: SyncOptions): Promise<void> {
   try {
     const db = await initializeDatabase();
     const scope = scopeKey(session.tenantId, session.userId);
     const statuses = options.force
-      ? '("pending", "retryable", "manual_retry")'
-      : '("pending", "retryable")';
+      ? "('pending', 'retryable', 'manual_retry')"
+      : "('pending', 'retryable')";
     const nextAttemptClause = options.force
       ? ''
       : ' AND (next_attempt_at IS NULL OR next_attempt_at <= ?)';
@@ -37,6 +47,7 @@ export async function syncNow(session: Session, options: SyncOptions = {}): Prom
             operation_id: string;
             status: string;
             payment_id?: string;
+            declaration_id?: string;
             error?: string;
           }[];
         };
@@ -67,7 +78,7 @@ export async function syncNow(session: Session, options: SyncOptions = {}): Prom
           await db.runAsync(
             'UPDATE local_payments SET status = ?, payment_id = ?, result = ? WHERE operation_id = ?',
             status,
-            result.payment_id ?? null,
+            result.payment_id ?? result.declaration_id ?? null,
             JSON.stringify(result),
             result.operation_id,
           );
@@ -119,6 +130,7 @@ export async function syncNow(session: Session, options: SyncOptions = {}): Prom
             address: string;
             due_amount_cents: string;
           }[];
+          route: { id: string; status: string; route_date: string } | null;
           cursor: number;
           has_more: boolean;
           reset?: boolean;
@@ -134,6 +146,7 @@ export async function syncNow(session: Session, options: SyncOptions = {}): Prom
           await db.runAsync('DELETE FROM authorized_customers WHERE scope_key = ?', scope);
         }
         await db.runAsync('DELETE FROM authorized_route_stops WHERE scope_key = ?', scope);
+        await db.runAsync('DELETE FROM authorized_routes WHERE scope_key = ?', scope);
         for (const customer of pull.data.customers)
           await db.runAsync(
             'INSERT OR REPLACE INTO authorized_customers (scope_key,id,name,status,updated_at,collector_name,zone_name,assignment_status) VALUES (?,?,?,?,?,?,?,?)',
@@ -167,6 +180,14 @@ export async function syncNow(session: Session, options: SyncOptions = {}): Prom
             stop.status,
             stop.address,
             stop.due_amount_cents,
+          );
+        if (pull.data.route)
+          await db.runAsync(
+            'INSERT INTO authorized_routes (scope_key,id,status,route_date) VALUES (?,?,?,?)',
+            scope,
+            pull.data.route.id,
+            pull.data.route.status,
+            pull.data.route.route_date,
           );
         await db.runAsync(
           'INSERT OR REPLACE INTO app_metadata (key, value) VALUES (?, ?)',
@@ -203,7 +224,7 @@ export async function syncNow(session: Session, options: SyncOptions = {}): Prom
     const db = await initializeDatabase();
     const scope = scopeKey(session.tenantId, session.userId);
     const rows = await db.getAllAsync<{ operation_id: string; attempt_count: number }>(
-      'SELECT operation_id, attempt_count FROM offline_outbox WHERE tenant_id = ? AND user_id = ? AND status IN ("pending", "retryable", "manual_retry")',
+      "SELECT operation_id, attempt_count FROM offline_outbox WHERE tenant_id = ? AND user_id = ? AND status IN ('pending', 'retryable', 'manual_retry')",
       session.tenantId,
       session.userId,
     );
@@ -228,7 +249,5 @@ export async function syncNow(session: Session, options: SyncOptions = {}): Prom
       );
     });
     throw error;
-  } finally {
-    running = false;
   }
 }

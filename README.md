@@ -20,12 +20,21 @@ SaaS multiempresa con panel administrativo, app móvil inicial y módulo comerci
 
 1. Copiá `.env.example` a `.env` y `apps/backend/.env.example` a `apps/backend/.env`.
 2. Cambiá `DB_PASSWORD` en ambos archivos por el mismo valor local. Definí `DEV_SEED_PASSWORD`, `DEV_OWNER_EMAIL`, `DEV_ADMIN_EMAIL` y `DEV_PLATFORM_EMAIL` en `apps/backend/.env` para crear las cuentas locales. La contraseña debe tener al menos 12 caracteres. Los archivos `.env` están ignorados por Git.
-3. Construí y arrancá: `docker compose up -d --build` (o `make up`).
+3. Construí y arrancá con `make up`. Ese comando crea, si hace falta, el volumen persistente de PostgreSQL antes de iniciar los servicios.
 4. Generá la clave de Laravel: `docker compose exec app php artisan key:generate`.
 5. Ejecutá `make migrate` y `make seed`.
 6. Abrí `http://localhost:8080/login` e ingresá con el correo y la contraseña configurados. Mailpit para recuperación de contraseña está en `http://localhost:8025`.
 
 El primer arranque descarga imágenes e instala dependencias dentro de la imagen PHP. Si cambian dependencias de Composer o assets web, reconstruí con `make up`. Si cambiás solo PHP/Blade, el volumen de desarrollo refleja el cambio sin reconstruir. Los puertos HTTP y PostgreSQL del equipo pueden cambiarse con `APP_PORT` y `DB_PORT` en `.env`; PostgreSQL escucha por defecto en `127.0.0.1:55432` para evitar conflictos con instalaciones locales.
+
+### Persistencia local de datos
+
+PostgreSQL usa el volumen externo `app-cobranzas_postgres_data`. Por ser externo,
+`docker compose down -v` no puede eliminarlo: las cuentas demo y sus datos
+persisten entre reinicios y recreaciones de contenedores. Usá siempre `make up`
+para iniciar el entorno. Solo `docker volume rm app-cobranzas_postgres_data` o
+una operación explícita como `migrate:fresh` puede borrar o reinicializar los
+datos locales.
 
 ## Comandos de desarrollo
 

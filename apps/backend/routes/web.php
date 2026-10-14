@@ -3,6 +3,7 @@
 use App\Http\Controllers\AcceptInvitationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CatalogController;
+use App\Http\Controllers\CollectionDashboardStreamController;
 use App\Http\Controllers\CompanySettingsController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\PasswordResetController;
@@ -42,6 +43,7 @@ Route::middleware('auth')->group(function (): void {
     Route::middleware('tenant.admin')->group(function (): void {
         Route::redirect('/dashboard', '/admin/collections')->name('dashboard');
         Route::view('/admin/collections', 'collections.index')->name('collections.index');
+        Route::get('/admin/collections/stream', CollectionDashboardStreamController::class)->name('collections.stream');
         Route::view('/admin/collections/portfolios', 'collections.portfolios')->name('collections.portfolios');
         Route::view('/admin/collections/structures', 'collections.structures')->name('collections.structures');
         Route::view('/admin/authorization', 'authorization.index')->name('authorization.index');

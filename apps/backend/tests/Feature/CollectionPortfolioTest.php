@@ -3,16 +3,19 @@
 namespace Tests\Feature;
 
 use App\Domain\Collections\CollectionAssignmentService;
+use App\Domain\Collections\CollectionDashboardNotifier;
 use App\Domain\Collections\CollectionRouteService;
+use App\Domain\Collections\CollectionWorkflowService;
 use App\Domain\Collections\PaymentService;
 use App\Domain\Tenancy\AuthorizationManagementService;
 use App\Livewire\CollectionPortfolioManager;
-use App\Livewire\CollectionStructuresManager;
 use App\Livewire\CollectionsDashboard;
+use App\Livewire\CollectionStructuresManager;
+use App\Models\CollectionDeclaration;
 use App\Models\CollectionRoute;
-use App\Models\CollectionVisit;
 use App\Models\CollectionTeam;
 use App\Models\CollectionTeamMember;
+use App\Models\CollectionVisit;
 use App\Models\CollectionZone;
 use App\Models\Customer;
 use App\Models\CustomerAccountEntry;
@@ -130,7 +133,9 @@ class CollectionPortfolioTest extends TestCase
         $this->withToken($token)->postJson('/api/v1/tenant/select', ['tenant_id' => $owner->tenant_id])->assertOk();
         $this->withToken($token)->getJson('/api/v1/sync/pull?cursor=0')->assertOk()
             ->assertJsonPath('data.route_stops.0.customer_id', $customer->id)
-            ->assertJsonPath('data.route_stops.0.due_amount_cents', '1000');
+            ->assertJsonPath('data.route_stops.0.due_amount_cents', '1000')
+            ->assertJsonPath('data.route.id', $route->id)
+            ->assertJsonPath('data.route.status', 'published');
 
     }
 
@@ -153,6 +158,60 @@ class CollectionPortfolioTest extends TestCase
             'status' => 'pending',
             'scheduled_amount' => '10.00',
         ]);
+    }
+
+    public function test_collector_can_start_a_published_route_and_sync_a_transfer_declaration(): void
+    {
+        $owner = $this->member('owner');
+        $collector = $this->member('collector', $owner->tenant);
+        $customer = $this->customer($owner);
+        $sale = $this->debt($owner, $customer);
+        app(CollectionAssignmentService::class)->assign($owner->tenant, $owner->user, $customer, $collector);
+        $route = app(CollectionRouteService::class)->program($owner->tenant, $owner->user, $collector->id, today()->toDateString(), [$sale->id]);
+        $visit = $route->visits->first();
+
+        app(CollectionWorkflowService::class)->startRoute($owner->tenant, $collector->user, $route);
+        $token = $collector->user->createToken('collector-route')->plainTextToken;
+        $this->withToken($token)->postJson('/api/v1/tenant/select', ['tenant_id' => $owner->tenant_id])->assertOk();
+        $device = $this->withToken($token)->postJson('/api/v1/mobile-devices', ['device_identifier' => 'route-'.Str::uuid()])->assertOk()->json('data.id');
+        $operationId = (string) Str::uuid();
+        $this->withToken($token)->postJson('/api/v1/sync/push', ['device_id' => $device, 'operations' => [[
+            'operation_id' => $operationId,
+            'schema_version' => 1,
+            'type' => 'collection_declaration',
+            'recorded_at' => now()->toIso8601String(),
+            'payload' => ['visit_id' => $visit->id, 'components' => [['method' => 'bank_transfer', 'amount' => '10.00', 'reference' => 'DEMO-TRANSFER-001']]],
+        ]]])->assertOk()->assertJsonPath('data.operations.0.status', 'pending_review');
+
+        $declaration = CollectionDeclaration::forTenant($owner->tenant)
+            ->where('operation_id', $operationId)
+            ->firstOrFail();
+
+        $this->assertSame('pending', $declaration->status);
+        $this->assertSame('recorded', $visit->fresh()->status);
+        $this->assertNotSame('', app(CollectionDashboardNotifier::class)->revision($owner->tenant_id));
+    }
+
+    public function test_collections_stream_requires_the_active_tenant_and_emits_an_invalidation_without_financial_data(): void
+    {
+        $owner = $this->member('owner');
+        $revision = app(CollectionDashboardNotifier::class)->notify($owner->tenant_id);
+
+        $response = $this->actingAs($owner->user)
+            ->withSession(['active_tenant_id' => $owner->tenant_id])
+            ->get('/admin/collections/stream');
+
+        $response->assertOk()->assertHeader('Content-Type', 'text/event-stream; charset=utf-8');
+        $stream = $response->streamedContent();
+        $this->assertStringContainsString('event: collections.changed', $stream);
+        $this->assertStringContainsString('id: '.$revision, $stream);
+        $this->assertStringNotContainsString($owner->tenant_id, $stream);
+
+        $other = $this->member('owner');
+        $this->actingAs($other->user)
+            ->withSession(['active_tenant_id' => $owner->tenant_id])
+            ->get('/admin/collections/stream')
+            ->assertForbidden();
     }
 
     public function test_collections_dashboard_rebuilds_the_tenant_context_on_livewire_actions(): void

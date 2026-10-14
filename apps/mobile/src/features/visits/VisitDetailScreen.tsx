@@ -6,17 +6,26 @@ import { AppHeader } from '../../components/AppHeader';
 import { EmptyState } from '../../components/EmptyState';
 import { Screen } from '../../components/Screen';
 import { SurfaceCard } from '../../components/SurfaceCard';
-import { routeStops, scopeKey, type LocalRouteStop } from '../../database/financial';
+import {
+  route as currentRoute,
+  routeStops,
+  scopeKey,
+  type LocalRoute,
+  type LocalRouteStop,
+} from '../../database/financial';
 import type { RootStackParamList } from '../../types/navigation';
 type Props = NativeStackScreenProps<RootStackParamList, 'VisitDetail'>;
 export function VisitDetailScreen({ navigation, route }: Props) {
   const { state } = useAuth();
   const [stop, setStop] = useState<LocalRouteStop>();
+  const [activeRoute, setActiveRoute] = useState<LocalRoute | null>(null);
   useEffect(() => {
     if (!state) return;
-    routeStops(scopeKey(state.capabilities.tenant.id, state.capabilities.user.id)).then((rows) =>
+    const scope = scopeKey(state.capabilities.tenant.id, state.capabilities.user.id);
+    routeStops(scope).then((rows) =>
       setStop(rows.find((row) => row.id === route.params.stopId)),
     );
+    currentRoute(scope).then(setActiveRoute);
   }, [route.params.stopId, state]);
   if (!stop)
     return (
@@ -46,16 +55,21 @@ export function VisitDetailScreen({ navigation, route }: Props) {
       </SurfaceCard>
       <Button
         mode="contained"
+        disabled={activeRoute?.status !== 'in_progress'}
         onPress={() => navigation.navigate('VisitOutcome', { stopId: stop.id })}
       >
         Registrar resultado
       </Button>
       <Button
         mode="outlined"
+        disabled={activeRoute?.status !== 'in_progress'}
         onPress={() => navigation.navigate('RegisterPayment', { visitId: stop.id })}
       >
         Registrar cobro
       </Button>
+      {activeRoute?.status !== 'in_progress' ? (
+        <Text>Iniciá la hoja desde la pestaña Ruta antes de registrar un resultado.</Text>
+      ) : null}
     </Screen>
   );
 }

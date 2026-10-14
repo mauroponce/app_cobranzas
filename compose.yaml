@@ -118,6 +118,8 @@ services:
 
 volumes:
   postgres_data:
+    external: true
+    name: app-cobranzas_postgres_data
   redis_data:
   backend_vendor:
   backend_assets:

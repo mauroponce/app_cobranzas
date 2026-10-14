@@ -2,6 +2,12 @@
 
 App Cobranzas es un monorepo con Laravel 13 (`apps/backend`), panel Blade/Livewire/Tailwind/DaisyUI, aplicación Expo/React Native (`apps/mobile`), PostgreSQL, Redis y Mailpit local. El backend decide la autorización. La API REST vive en `/api/v1` y utiliza Sanctum.
 
+El panel de cobranzas usa Server-Sent Events para invalidar la tabla cuando una
+declaración móvil queda persistida. El stream es autenticado por sesión y
+empresa activa; Redis solo conserva una revisión opaca por empresa. La
+actualización no transmite importes ni datos de clientes por el canal SSE y no
+usa WebSockets.
+
 ## Modelo multiempresa
 
 Una base PostgreSQL compartida contiene `users` (identidad global), `tenants`, `tenant_memberships` (rol y estado por empresa), `tenant_invitations`, `platform_administrators` y `audit_events`. Las claves principales son UUID. La pertenencia `(tenant_id, user_id)` es única. Cada empresa activa se crea con un propietario activo y las acciones de membresía protegen al último propietario.
@@ -27,7 +33,11 @@ La fuente de verdad ejecutable es `apps/backend/app/Domain/Tenancy/RoleMatrix.ph
 | `viewer` | Consultar empresa, clientes, ventas, cobros, rutas, rendiciones e informes |
 | `platform_admin` | Solo administración de empresas; no es un rol de membresía |
 
-Los Gates evalúan la capacidad contra la membresía activa del request. Las rutas y servicios autorizan en servidor; ocultar botones solo mejora la interfaz. Clientes, catálogo y presupuestos implementan las capacidades de la etapa 3; las ventas, cuotas y cobranzas siguen pendientes.
+Los Gates evalúan la capacidad contra la membresía activa del request. Las rutas y
+servicios autorizan en servidor; ocultar botones solo mejora la interfaz. El
+flujo de cobranza móvil registra declaraciones pendientes, y su tratamiento
+administrativo se documenta en [cobros](payments.md) y
+[sincronización offline](offline-sync.md).
 
 ## Invitaciones, auditoría y plataforma
 
@@ -45,7 +55,7 @@ Para agregar un módulo, declarar capacidades estables en `RoleMatrix`, asignarl
 
 ## Etapa 6: carteras de cobranza
 
-Las carteras, equipos y zonas se documentan en [carteras de cobranza](collection-portfolios.md). La asignación de cobrador es independiente de la relación comercial con el vendedor. Las consultas de cobros, el registro de pagos y `/sync/pull` aplican los scopes `assigned`, `team` y `all` sobre asignaciones activas de la empresa.
+Las carteras, equipos y zonas se documentan en [carteras de cobranza](collection-portfolios.md). La asignación de cobrador es independiente de la relación comercial con el vendedor. Las consultas de cobros, el registro de declaraciones y `/sync/pull` aplican los scopes `assigned`, `team` y `all` sobre asignaciones activas de la empresa.
 
 ## Verificación
 

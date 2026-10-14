@@ -1,7 +1,10 @@
-.PHONY: up down logs migrate seed test shell composer artisan assets
+.PHONY: up down logs migrate seed test shell composer artisan assets database-volume
 
-up:
+up: database-volume
 	docker compose up -d --build
+
+database-volume:
+	docker volume create app-cobranzas_postgres_data >/dev/null
 
 down:
 	docker compose down

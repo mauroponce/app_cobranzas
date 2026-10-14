@@ -6,6 +6,7 @@ import { AppHeader } from '../../components/AppHeader';
 import { Screen } from '../../components/Screen';
 import { queueOfflineCollectionDeclaration } from '../../sync/outbox';
 import { syncNow } from '../../sync/worker';
+import { routeStops, scopeKey } from '../../database/financial';
 import type { RootStackParamList } from '../../types/navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterPayment'>;
@@ -15,7 +16,10 @@ export function RegisterPaymentScreen({ navigation, route }: Props) {
   const save = async () => {
     if (!state || !/^\d+(\.\d{1,2})?$/.test(amount) || amount === '0') { setMessage('Ingresá un importe válido.'); return; }
     const recordedAt = new Date().toISOString();
-    await queueOfflineCollectionDeclaration({ operationId: globalThis.crypto.randomUUID(), tenantId: state.capabilities.tenant.id, userId: state.capabilities.user.id, deviceId: state.deviceId, recordedAt, payload: { visit_id: route.params.visitId, components: [{ method, amount, reference: reference || undefined }] } });
+    const scope = scopeKey(state.capabilities.tenant.id, state.capabilities.user.id);
+    const visit = (await routeStops(scope)).find((stop) => stop.id === route.params.visitId);
+    if (!visit) { setMessage('La visita ya no está disponible en este dispositivo.'); return; }
+    await queueOfflineCollectionDeclaration({ operationId: globalThis.crypto.randomUUID(), tenantId: state.capabilities.tenant.id, userId: state.capabilities.user.id, deviceId: state.deviceId, customerId: visit.customer_id, recordedAt, payload: { visit_id: route.params.visitId, components: [{ method, amount, reference: reference || undefined }] } });
     setMessage('Declaración guardada. Queda pendiente de conciliación administrativa.');
     syncNow({ token: state.token, deviceId: state.deviceId, tenantId: state.capabilities.tenant.id, userId: state.capabilities.user.id }).catch(() => {});
   };

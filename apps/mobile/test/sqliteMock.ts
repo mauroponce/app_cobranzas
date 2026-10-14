@@ -7,6 +7,7 @@ type State = {
   customers: Map<string, RecordValue>;
   obligations: Map<string, RecordValue>;
   routeStops: Map<string, RecordValue>;
+  routes: Map<string, RecordValue>;
 };
 
 const state: State = {
@@ -16,6 +17,7 @@ const state: State = {
   customers: new Map(),
   obligations: new Map(),
   routeStops: new Map(),
+  routes: new Map(),
 };
 
 function clone<T>(value: T): T {
@@ -29,6 +31,7 @@ function snapshot(): State {
     customers: new Map([...state.customers].map(([key, value]) => [key, clone(value)])),
     obligations: new Map([...state.obligations].map(([key, value]) => [key, clone(value)])),
     routeStops: new Map([...state.routeStops].map(([key, value]) => [key, clone(value)])),
+    routes: new Map([...state.routes].map(([key, value]) => [key, clone(value)])),
   };
 }
 function restore(value: State): void {
@@ -38,6 +41,7 @@ function restore(value: State): void {
   state.customers = value.customers;
   state.obligations = value.obligations;
   state.routeStops = value.routeStops;
+  state.routes = value.routes;
 }
 function values<T extends RecordValue>(entries: Map<string, T>): T[] {
   return [...entries.values()].map(clone);
@@ -64,7 +68,9 @@ const database = {
         tenant_id: tenantId,
         user_id: userId,
         device_id: deviceId,
-        type: 'cash_payment',
+        type: sql.includes("'collection_declaration'")
+          ? 'collection_declaration'
+          : 'cash_payment',
         payload,
         recorded_at: recordedAt,
         status: 'pending',
@@ -84,7 +90,7 @@ const database = {
         scope_key: scope,
         customer_id: customerId,
         amount,
-        status: 'pending_sync',
+        status: sql.includes("'pending', ?") ? 'pending' : 'pending_sync',
         recorded_at: recordedAt,
         payment_id: null,
         result: null,
@@ -144,6 +150,10 @@ const database = {
         if (row.scope_key === parameters[0]) state.routeStops.delete(key);
       return;
     }
+    if (sql.startsWith('DELETE FROM authorized_routes')) {
+      state.routes.delete(String(parameters[0]));
+      return;
+    }
     if (sql.includes('authorized_customers')) {
       const [scope, id, name, status, updatedAt, collectorName, zoneName, assignmentStatus] =
         parameters as string[];
@@ -186,6 +196,11 @@ const database = {
       });
       return;
     }
+    if (sql.includes('authorized_routes')) {
+      const [scope, id, status, routeDate] = parameters as string[];
+      state.routes.set(scope, { scope_key: scope, id, status, route_date: routeDate });
+      return;
+    }
     throw new Error(`Unsupported SQL: ${sql}`);
   },
   getAllAsync: async <T>(sql: string, ...parameters: unknown[]): Promise<T[]> => {
@@ -197,7 +212,7 @@ const database = {
             row.tenant_id === tenantId &&
             row.user_id === userId &&
             (sql.includes('status IN')
-              ? /"pending"/.test(sql) &&
+              ? /['"]pending['"]/.test(sql) &&
                 (row.status === 'pending' ||
                   row.status === 'retryable' ||
                   (sql.includes('manual_retry') && row.status === 'manual_retry'))
@@ -252,6 +267,7 @@ export function resetSqliteMock(): void {
     customers: new Map(),
     obligations: new Map(),
     routeStops: new Map(),
+    routes: new Map(),
   });
 }
 export function sqliteRows(): State {

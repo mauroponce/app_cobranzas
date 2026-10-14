@@ -43,7 +43,12 @@ Las pestañas persistentes son Inicio, Ruta, Clientes, Cobros y Perfil. Detalle 
 
 Las métricas se distribuyen en dos columnas de igual ancho y altura mínima por fila. Las tarjetas y los textos pueden encogerse sin ancho fijo horizontal. Los estados vacíos describen la ausencia de datos reales. `—` indica un valor no disponible; no representa cero. Una operación futura sin conexión deberá mostrar **Pendiente de sincronización** hasta que Laravel la acepte. Transferencias requieren verificación y los pagos online no cancelan visitas. Rendición incluye solo dinero físico del cobrador.
 
-La app todavía no tiene autenticación móvil, endpoints de cartera/ruta/cobros ni motor de sincronización financiera. Por eso no guarda cobros o visitas desde estos formularios: las acciones de confirmación permanecen deshabilitadas. El botón de conexión del perfil consulta el healthcheck real de Laravel. No se presentan fixtures financieros como datos de producción.
+La app autentica al cobrador contra Laravel y sincroniza su cartera, hoja y
+visitas autorizadas. Una hoja publicada debe iniciarse desde Ruta antes de
+registrar una declaración desde una visita. El cobro se guarda primero en la
+outbox local y se muestra como pendiente; cuando Laravel lo acepta permanece
+pendiente de conciliación administrativa. No se presentan fixtures financieros
+como datos de producción.
 
 ## Verificación visual
 

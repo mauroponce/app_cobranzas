@@ -9,3 +9,9 @@ Una reasignación o desasignación incrementa `tenants.authorization_version`. E
 Las zonas usan `collection_zones` y `customer_collection_zone_assignments`, también históricas. Son etiquetas operativas sin geolocalización ni ordenamiento de visitas. Los equipos usan `collection_teams` y `collection_team_members`; las altas y bajas de miembros son históricas.
 
 Las capacidades de administración son `customers.assign_collector`, `customers.unassign_collector`, `customers.view_assignments`, `collection_zones.view`, `collection_zones.manage`, `collection_teams.view`, `collection_teams.manage` y `collection_teams.manage_members`. Solo el backend aplica estas decisiones y registra auditoría.
+
+Las asignaciones habilitan la cartera y sus visitas en la hoja diaria del
+cobrador, pero no sustituyen la autorización de cada operación. Al sincronizar
+una declaración, Laravel vuelve a validar la membresía, la empresa, la hoja
+iniciada y la visita. La entrega y el ciclo de vida offline de esas
+declaraciones están documentados en [sincronización offline](offline-sync.md).

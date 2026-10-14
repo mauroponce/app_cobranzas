@@ -32,6 +32,7 @@ export type LocalRouteStop = {
   address: string | null;
   due_amount_cents: string | null;
 };
+export type LocalRoute = { id: string; status: string; route_date: string };
 export const scopeKey = (tenantId: string, userId: string) => `${tenantId}:${userId}`;
 
 export async function customers(scope: string): Promise<LocalCustomer[]> {
@@ -63,6 +64,13 @@ export async function routeStops(scope: string): Promise<LocalRouteStop[]> {
     scope,
   );
 }
+export async function route(scope: string): Promise<LocalRoute | null> {
+  const db = await initializeDatabase();
+  return db.getFirstAsync<LocalRoute>(
+    'SELECT id, status, route_date FROM authorized_routes WHERE scope_key = ?',
+    scope,
+  );
+}
 export async function pendingCount(scope: string): Promise<number> {
   const db = await initializeDatabase();
   const row = await db.getFirstAsync<{ count: number }>(
@@ -79,9 +87,9 @@ export async function syncInfo(
     'SELECT value FROM app_metadata WHERE key = ?',
     `sync:last_success:${scope}`,
   );
-  const error = await db.getFirstAsync<{ last_error: string }>(
-    "SELECT last_error FROM offline_outbox WHERE tenant_id || ':' || user_id = ? AND last_error IS NOT NULL ORDER BY recorded_at DESC LIMIT 1",
-    scope,
+  const error = await db.getFirstAsync<{ value: string }>(
+    'SELECT value FROM app_metadata WHERE key = ?',
+    `sync:last_error:${scope}`,
   );
-  return { lastSuccess: success?.value ?? null, lastError: error?.last_error ?? null };
+  return { lastSuccess: success?.value ?? null, lastError: error?.value ?? null };
 }

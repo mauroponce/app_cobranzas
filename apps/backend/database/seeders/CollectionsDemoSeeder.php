@@ -180,7 +180,7 @@ class CollectionsDemoSeeder extends Seeder
 
     private function routes(Tenant $tenant, TenantMembership $admin, TenantMembership $firstCollector, TenantMembership $secondCollector, Sale $brunoSale, Sale $anaSale, array $zones): void
     {
-        $date = now()->toDateString();
+        $date = today($tenant->timezone)->toDateString();
         $north = CollectionRoute::firstOrCreate([
             'tenant_id' => $tenant->id,
             'route_date' => $date,

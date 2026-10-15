@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class CompanySettingsController extends Controller
@@ -23,7 +24,11 @@ class CompanySettingsController extends Controller
     public function update(Request $request): RedirectResponse
     {
         Gate::authorize('tenant.update');
-        $data = $request->validate(['name' => ['required', 'string', 'max:255'], 'timezone' => ['required', 'timezone'], 'currency' => ['required', 'in:ARS']]);
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'timezone' => ['required', Rule::in(['America/Argentina/Buenos_Aires'])],
+            'currency' => ['required', 'in:ARS'],
+        ]);
         $tenant = $request->attributes->get('activeTenant');
         DB::transaction(function () use ($tenant, $data, $request): void {
             $lockedTenant = Tenant::whereKey($tenant->id)->lockForUpdate()->firstOrFail();

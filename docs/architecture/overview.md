@@ -2,6 +2,13 @@
 
 App Cobranzas es un monorepo con Laravel 13 (`apps/backend`), panel Blade/Livewire/Tailwind/DaisyUI, aplicación Expo/React Native (`apps/mobile`), PostgreSQL, Redis y Mailpit local. El backend decide la autorización. La API REST vive en `/api/v1` y utiliza Sanctum.
 
+La zona horaria operativa única es `America/Argentina/Buenos_Aires`. Laravel,
+los procesos de cola, el scheduler y las presentaciones móviles calculan las
+fechas de negocio con esa zona. PostgreSQL conserva timestamps absolutos; las
+interfaces los convierten a Buenos Aires al mostrarlos. La tabla `tenants`
+impide configurar otra zona para evitar discrepancias entre empresa, rutas y
+sincronización.
+
 El panel de cobranzas usa Server-Sent Events para invalidar la tabla cuando una
 declaración móvil queda persistida. El stream es autenticado por sesión y
 empresa activa; Redis solo conserva una revisión opaca por empresa. La

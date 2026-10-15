@@ -137,8 +137,12 @@ class AccessManagementTest extends TestCase
         $owner = $this->member();
         $this->actingAs($owner->user)->patch('/admin/settings/company', [
             'name' => 'Trotamundos Sur', 'timezone' => 'America/Argentina/Cordoba', 'currency' => 'ARS',
+        ])->assertSessionHasErrors('timezone');
+        $this->actingAs($owner->user)->patch('/admin/settings/company', [
+            'name' => 'Trotamundos Sur', 'timezone' => 'America/Argentina/Buenos_Aires', 'currency' => 'ARS',
         ])->assertRedirect();
         $this->assertSame('Trotamundos Sur', $owner->tenant->fresh()->name);
+        $this->assertSame('America/Argentina/Buenos_Aires', $owner->tenant->fresh()->timezone);
         $this->assertDatabaseHas('audit_events', ['action' => 'tenant.settings_updated']);
         $platform = User::factory()->create();
         PlatformAdministrator::create(['user_id' => $platform->id]);
@@ -146,8 +150,21 @@ class AccessManagementTest extends TestCase
             'name' => 'Nueva Empresa', 'slug' => 'nueva-empresa', 'owner_email' => $owner->user->email,
         ])->assertRedirect();
         $newTenant = Tenant::where('slug', 'nueva-empresa')->firstOrFail();
+        $this->assertSame('America/Argentina/Buenos_Aires', $newTenant->timezone);
         $this->assertDatabaseHas('tenant_memberships', ['tenant_id' => $newTenant->id, 'user_id' => $owner->user_id, 'role' => 'owner', 'status' => 'active']);
         $this->assertDatabaseHas('audit_events', ['action' => 'tenant.created', 'tenant_id' => $newTenant->id]);
+    }
+
+    public function test_database_rejects_a_tenant_outside_the_buenos_aires_timezone(): void
+    {
+        $this->expectException(QueryException::class);
+
+        Tenant::create([
+            'name' => 'Otra zona',
+            'slug' => 'otra-zona',
+            'timezone' => 'UTC',
+            'currency' => 'ARS',
+        ]);
     }
 
     public function test_pending_invitation_is_unique_per_tenant_and_email(): void

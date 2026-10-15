@@ -8,6 +8,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { ListScreen } from '../../components/Screen';
 import { SectionTitle } from '../../components/SectionTitle';
 import { SurfaceCard } from '../../components/SurfaceCard';
+import { formatDateTime } from '../../data/collectorData';
 import {
   payments,
   pendingCount,
@@ -99,7 +100,7 @@ export function CollectionsScreen() {
               <Text variant="titleMedium">{pending} pendientes de sincronización</Text>
               <Text variant="bodySmall">
                 {lastSuccess
-                  ? `Última sincronización: ${new Date(lastSuccess).toLocaleString('es-AR')}`
+                  ? `Última sincronización: ${formatDateTime(lastSuccess)}`
                   : 'Todavía no hay una sincronización exitosa.'}
               </Text>
               {lastError ? <Text variant="bodySmall">Último error: {lastError}</Text> : null}
@@ -115,7 +116,7 @@ export function CollectionsScreen() {
             <Text variant="titleMedium">$ {item.amount}</Text>
             <Text>{statusMessage(item)}</Text>
             <Text variant="bodySmall">
-              {item.recorded_at} · operación {item.operation_id}
+              {formatDateTime(item.recorded_at)} · operación {item.operation_id}
             </Text>
           </SurfaceCard>
         )}

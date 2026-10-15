@@ -4,6 +4,11 @@ Este documento reúne las decisiones funcionales vigentes para la primera
 iniciativa del módulo de cobranzas. Ante una diferencia con propuestas,
 prototipos o documentos anteriores, estas decisiones prevalecen.
 
+Todas las fechas de negocio y las fechas visibles se interpretan en la zona
+horaria `America/Argentina/Buenos_Aires`. Los instantes de sincronización y
+auditoría conservan un valor absoluto para que los reintentos no alteren el
+momento registrado, pero se presentan al usuario en la hora de Buenos Aires.
+
 ## Alcance de la primera iniciativa
 
 Incluye programación, hojas de ruta, visitas, declaraciones de cobro,

@@ -18,6 +18,9 @@ use App\Policies\ProductPolicy;
 use App\Policies\QuotationPolicy;
 use App\Policies\SaleApplicationPolicy;
 use App\Policies\SalePolicy;
+use App\Support\ProtectedDatabaseCommand;
+use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
@@ -37,6 +40,19 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Event::listen(CommandStarting::class, function (CommandStarting $event): void {
+            $driver = (string) config('database.default');
+            $connection = config("database.connections.{$driver}", []);
+
+            ProtectedDatabaseCommand::ensureAllowed(
+                $event->command,
+                (string) app()->environment(),
+                $driver,
+                is_array($connection) ? $connection : [],
+                (bool) config('database.allow_destructive_commands', false),
+            );
+        });
+
         Livewire::addPersistentMiddleware([ResolveAdminTenant::class]);
         Gate::policy(Customer::class, CustomerPolicy::class);
         Gate::policy(Product::class, ProductPolicy::class);

@@ -16,7 +16,8 @@ migrate:
 	docker compose exec app php artisan migrate
 
 seed:
-	docker compose exec app php artisan db:seed
+	@test "$(CONFIRM_DATABASE_WRITE)" = "yes" || (echo "Comando bloqueado: usá 'make seed CONFIRM_DATABASE_WRITE=yes' solo con autorización explícita." && exit 1)
+	docker compose exec -e ALLOW_DESTRUCTIVE_DATABASE_COMMANDS=true app php artisan db:seed
 
 test:
 	docker compose exec -e APP_ENV=testing -e DB_DATABASE=app_cobranzas_test -e SESSION_DRIVER=array app php artisan test

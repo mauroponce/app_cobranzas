@@ -42,14 +42,15 @@ datos locales.
 | --- | --- |
 | `make up` / `make down` | Arrancar o detener servicios |
 | `make logs` | Seguir los registros |
-| `make migrate` / `make seed` | Migraciones y seeder local |
+| `make migrate` | Aplicar migraciones pendientes sin reconstruir la base |
+| `make seed CONFIRM_DATABASE_WRITE=yes` | Ejecutar el seeder local con confirmación explícita |
 | `make test` | Pruebas backend contra la base PostgreSQL de pruebas |
 | `make shell` | Shell del contenedor PHP |
 | `make artisan ARGS='route:list'` | Ejecutar Artisan |
 | `make composer ARGS='install'` | Ejecutar Composer |
 | `make assets` | Compilar assets Blade/Livewire con Node en Docker |
 
-La base `app_cobranzas_test` se crea al inicializar el volumen PostgreSQL. Si ya existe un volumen creado antes de añadirla, créala con `docker compose exec postgres createdb -U app_cobranzas app_cobranzas_test`. No apuntes `make test` a una base con datos importantes.
+La base `app_cobranzas_test` se crea al inicializar el volumen PostgreSQL. Si ya existe un volumen creado antes de añadirla, créala con `docker compose exec postgres createdb -U app_cobranzas app_cobranzas_test`. PHPUnit fuerza esta base y la suite aborta antes de `RefreshDatabase` si la conexión efectiva no termina en `_test`. Los comandos que pueden borrar o reemplazar datos y `db:seed` quedan bloqueados salvo que la ejecución incluya `ALLOW_DESTRUCTIVE_DATABASE_COMMANDS=true`; esa habilitación solo se usa después de una solicitud explícita del usuario.
 
 ## API
 

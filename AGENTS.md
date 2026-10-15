@@ -8,6 +8,12 @@ El código, los identificadores y los comentarios de código se escriben en ingl
 
 ## Seguridad y datos
 
+- No ejecutar `db:seed`, `migrate:fresh`, `migrate:refresh`, `migrate:reset`,
+  `migrate:rollback`, `db:wipe`, `model:prune` ni eliminar volúmenes de datos
+  salvo que el usuario lo pida explícitamente en la conversación actual. Una
+  solicitud de implementar, probar o migrar no autoriza a borrar o regenerar
+  datos. Ejecutar las pruebas backend mediante `make test`; nunca apuntarlas a
+  una base que no termine en `_test`.
 - Toda tabla de negocio perteneciente a una empresa debe tener `tenant_id`, relaciones y consultas acotadas al tenant activo. El servidor valida la pertenencia vigente antes de usarlo; nunca acepta un `tenant_id` arbitrario del cliente como autorización.
 - Toda modificación de PostgreSQL se realiza mediante una migración versionada y una prueba relevante. No editar esquemas manualmente.
 - Las operaciones monetarias futuras usarán transacciones y claves de idempotencia donde corresponda. No usar `float` ni `double` para importes; preferir unidades enteras o tipos decimales precisos según el contrato del módulo.

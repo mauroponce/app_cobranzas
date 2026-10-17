@@ -18,6 +18,8 @@ class CollectionRoute extends Model
 
     public const IN_PROGRESS = 'in_progress';
 
+    public const SUBMITTED = 'submitted';
+
     public const COMPLETED = 'completed';
 
     public const CANCELLED = 'cancelled';

@@ -14,6 +14,7 @@ import {
   type LocalRouteStop,
 } from '../../database/financial';
 import type { RootStackParamList } from '../../types/navigation';
+import { formatMoney } from '../../data/collectorData';
 type Props = NativeStackScreenProps<RootStackParamList, 'VisitDetail'>;
 export function VisitDetailScreen({ navigation, route }: Props) {
   const { state } = useAuth();
@@ -51,7 +52,10 @@ export function VisitDetailScreen({ navigation, route }: Props) {
       />
       <SurfaceCard>
         <Text variant="labelMedium">Saldo exigible</Text>
-        <Text variant="headlineMedium">$ {stop.due_amount_cents ?? '0'}</Text>
+        <Text variant="headlineMedium">{formatMoney(stop.sale_due_amount_cents)}</Text>
+        <Text variant="bodySmall">
+          Saldo contractual total del cliente: {formatMoney(stop.customer_total_outstanding_cents)}
+        </Text>
         <Text>La declaración queda pendiente de conciliación administrativa.</Text>
       </SurfaceCard>
       <Button

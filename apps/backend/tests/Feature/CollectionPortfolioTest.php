@@ -77,10 +77,15 @@ class CollectionPortfolioTest extends TestCase
         $this->withToken($token)->postJson('/api/v1/tenant/select', ['tenant_id' => $owner->tenant_id])->assertOk();
         $pull = $this->withToken($token)->getJson('/api/v1/sync/pull?cursor=0')->assertOk();
         $pull->assertJsonCount(1, 'data.customers')->assertJsonPath('data.customers.0.id', $assigned->id);
-        $payment = app(PaymentService::class)->registerCash($owner->tenant, $collector->user, ['customer_id' => $assigned->id, 'amount' => '10.00']);
-        $this->assertSame('confirmed', $payment->status);
-        $this->expectException(HttpException::class);
-        app(PaymentService::class)->registerCash($owner->tenant, $collector->user, ['customer_id' => $outside->id, 'amount' => '10.00']);
+        foreach ([$assigned, $outside] as $customer) {
+            try {
+                app(PaymentService::class)->registerCash($owner->tenant, $collector->user, ['customer_id' => $customer->id, 'amount' => '10.00']);
+                $this->fail('El cobrador no debe confirmar efectivo por el servicio administrativo.');
+            } catch (HttpException $exception) {
+                $this->assertSame(403, $exception->getStatusCode());
+            }
+        }
+        $this->assertDatabaseCount('payments', 0);
     }
 
     public function test_team_scope_uses_active_supervisor_membership_and_not_salesperson(): void
@@ -133,7 +138,7 @@ class CollectionPortfolioTest extends TestCase
         $this->withToken($token)->postJson('/api/v1/tenant/select', ['tenant_id' => $owner->tenant_id])->assertOk();
         $this->withToken($token)->getJson('/api/v1/sync/pull?cursor=0')->assertOk()
             ->assertJsonPath('data.route_stops.0.customer_id', $customer->id)
-            ->assertJsonPath('data.route_stops.0.due_amount_cents', '1000')
+            ->assertJsonPath('data.route_stops.0.sale_due_amount_cents', '1000')
             ->assertJsonPath('data.route.id', $route->id)
             ->assertJsonPath('data.route.status', 'published');
 
@@ -223,7 +228,7 @@ class CollectionPortfolioTest extends TestCase
             'recorded_at' => now()->addMinutes(2)->toIso8601String(),
             'payload' => ['visit_id' => $visit->id, 'components' => [['method' => 'cash', 'amount' => '1.00']]],
         ]]])->assertOk()
-            ->assertJsonPath('data.operations.0.status', 'rejected')
+            ->assertJsonPath('data.operations.0.status', 'pending_review')
             ->assertJsonPath('data.operations.0.error', 'La hoja debe estar iniciada para registrar una declaración.');
 
         $this->assertDatabaseCount('collection_declarations', 2);
@@ -282,7 +287,7 @@ class CollectionPortfolioTest extends TestCase
         $this->withToken($token)->postJson('/api/v1/sync/push', ['device_id' => $device, 'operations' => [[
             'operation_id' => (string) Str::uuid(), 'schema_version' => 1, 'type' => 'cash_payment', 'recorded_at' => now()->toIso8601String(),
             'payload' => ['customer_id' => $customer->id, 'amount' => '10.00', 'received_at' => now()->toIso8601String()],
-        ]]])->assertOk()->assertJsonPath('data.operations.0.status', 'under_review');
+        ]]])->assertOk()->assertJsonPath('data.operations.0.status', 'pending_review');
         $this->assertSame('10.00', CustomerAccountEntry::where('customer_id', $customer->id)->value('outstanding_amount'));
     }
 

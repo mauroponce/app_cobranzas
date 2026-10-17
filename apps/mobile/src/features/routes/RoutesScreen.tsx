@@ -112,7 +112,16 @@ export function RoutesScreen() {
                   Iniciar hoja
                 </Button>
               ) : activeRoute?.status === 'in_progress' ? (
-                <StatusBadge label="Hoja en curso" kind="success" />
+                <>
+                  <StatusBadge label="Hoja en curso" kind="success" />
+                  <Button mode="outlined" onPress={() => navigation.navigate('Settlement')}>
+                    Preparar rendición
+                  </Button>
+                </>
+              ) : activeRoute?.status === 'submitted' ? (
+                <StatusBadge label="Rendición presentada" kind="warning" />
+              ) : activeRoute?.status === 'completed' ? (
+                <StatusBadge label="Hoja cerrada" kind="success" />
               ) : (
                 <StatusBadge label="Sin hoja disponible" />
               )}
@@ -141,7 +150,7 @@ export function RoutesScreen() {
               customerId: item.customer_id,
               customerName: item.customer_name,
               address: item.address ?? 'Dirección sin detalle',
-              dueMinor: item.due_amount_cents,
+              dueMinor: item.sale_due_amount_cents,
               status: item.status === 'recorded' ? 'completed' : 'pending',
               onlinePaymentConfirmed: false,
             }}

@@ -5,7 +5,13 @@ export type OfflineCashPayment = {
   tenantId: string;
   userId: string;
   deviceId: string;
-  payload: { customer_id: string; amount: string; allocations?: { account_entry_id: string; amount?: string }[]; received_at: string; notes?: string };
+  payload: {
+    customer_id: string;
+    amount: string;
+    allocations?: { account_entry_id: string; amount?: string }[];
+    received_at: string;
+    notes?: string;
+  };
   recordedAt: string;
 };
 
@@ -22,11 +28,28 @@ export type OfflineCollectionDeclaration = {
   recordedAt: string;
 };
 
+export type OfflineVisitOutcome = {
+  operationId: string;
+  tenantId: string;
+  userId: string;
+  deviceId: string;
+  payload: {
+    visit_id: string;
+    reason: 'absent' | 'refused' | 'insufficient_funds' | 'other';
+    notes?: string;
+  };
+  recordedAt: string;
+};
+
 export async function queueOfflineCollectionDeclaration(
   declaration: OfflineCollectionDeclaration,
 ): Promise<void> {
   const database = await initializeDatabase();
-  const amount = declaration.payload.components[0]?.amount ?? '0.00';
+  const amountCents = declaration.payload.components.reduce((total, component) => {
+    const [whole, fraction = ''] = component.amount.split('.');
+    return total + BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0'));
+  }, 0n);
+  const amount = `${amountCents / 100n}.${(amountCents % 100n).toString().padStart(2, '0')}`;
 
   await database.withTransactionAsync(async () => {
     await database.runAsync(
@@ -40,7 +63,7 @@ export async function queueOfflineCollectionDeclaration(
       declaration.recordedAt,
     );
     await database.runAsync(
-      "INSERT INTO local_payments (operation_id, scope_key, customer_id, amount, status, recorded_at) VALUES (?, ?, ?, ?, 'pending', ?)",
+      "INSERT INTO local_payments (operation_id, scope_key, customer_id, amount, status, recorded_at) VALUES (?, ?, ?, ?, 'pending_sync', ?)",
       declaration.operationId,
       `${declaration.tenantId}:${declaration.userId}`,
       declaration.customerId,
@@ -50,19 +73,47 @@ export async function queueOfflineCollectionDeclaration(
   });
 }
 
+export async function queueOfflineVisitOutcome(outcome: OfflineVisitOutcome): Promise<void> {
+  const database = await initializeDatabase();
+  await database.withTransactionAsync(async () => {
+    await database.runAsync(
+      `INSERT INTO offline_outbox (operation_id, tenant_id, user_id, device_id, type, payload, recorded_at, status, attempt_count)
+       VALUES (?, ?, ?, ?, 'visit_outcome', ?, ?, 'pending', 0)`,
+      outcome.operationId,
+      outcome.tenantId,
+      outcome.userId,
+      outcome.deviceId,
+      JSON.stringify(outcome.payload),
+      outcome.recordedAt,
+    );
+    await database.runAsync(
+      "UPDATE authorized_route_stops SET status = 'recorded', outcome = 'no_payment' WHERE scope_key = ? AND id = ? AND status = 'pending'",
+      `${outcome.tenantId}:${outcome.userId}`,
+      outcome.payload.visit_id,
+    );
+  });
+}
+
 export async function queueOfflineCashPayment(payment: OfflineCashPayment): Promise<void> {
   const database = await initializeDatabase();
   await database.withTransactionAsync(async () => {
-  await database.runAsync(
-    `INSERT INTO offline_outbox (operation_id, tenant_id, user_id, device_id, type, payload, recorded_at, status, attempt_count)
+    await database.runAsync(
+      `INSERT INTO offline_outbox (operation_id, tenant_id, user_id, device_id, type, payload, recorded_at, status, attempt_count)
      VALUES (?, ?, ?, ?, 'cash_payment', ?, ?, 'pending', 0)`,
-    payment.operationId,
-    payment.tenantId,
-    payment.userId,
-    payment.deviceId,
-    JSON.stringify(payment.payload),
-    payment.recordedAt,
-  );
-  await database.runAsync("INSERT INTO local_payments (operation_id, scope_key, customer_id, amount, status, recorded_at) VALUES (?, ?, ?, ?, 'pending_sync', ?)", payment.operationId, `${payment.tenantId}:${payment.userId}`, String(payment.payload.customer_id), String(payment.payload.amount), payment.recordedAt);
+      payment.operationId,
+      payment.tenantId,
+      payment.userId,
+      payment.deviceId,
+      JSON.stringify(payment.payload),
+      payment.recordedAt,
+    );
+    await database.runAsync(
+      "INSERT INTO local_payments (operation_id, scope_key, customer_id, amount, status, recorded_at) VALUES (?, ?, ?, ?, 'pending_sync', ?)",
+      payment.operationId,
+      `${payment.tenantId}:${payment.userId}`,
+      String(payment.payload.customer_id),
+      String(payment.payload.amount),
+      payment.recordedAt,
+    );
   });
 }

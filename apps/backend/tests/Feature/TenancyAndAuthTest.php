@@ -39,7 +39,8 @@ class TenancyAndAuthTest extends TestCase
         $this->csrfPost('/login', ['email' => $user->email, 'password' => 'very-secure-password'])
             ->assertRedirect('/dashboard');
         $this->assertAuthenticatedAs($user);
-        $this->get('/dashboard')->assertOk()->assertSee('App Cobranzas');
+        $this->get('/dashboard')->assertRedirect('/admin/collections');
+        $this->get('/admin/collections')->assertOk()->assertSee('App Cobranzas');
         $this->assertEquals($membership->tenant_id, session('active_tenant_id'));
     }
 
@@ -53,20 +54,21 @@ class TenancyAndAuthTest extends TestCase
         $this->actingAs($user)->get('/dashboard')->assertRedirect('/tenants/choose');
         $this->csrfPost('/tenants/choose', ['tenant_id' => $foreign->id])->assertNotFound();
         $this->csrfPost('/tenants/choose', ['tenant_id' => $first->tenant_id])->assertRedirect('/dashboard');
-        $this->get('/dashboard')->assertOk()->assertSee('company-one');
+        $this->get('/dashboard')->assertRedirect('/admin/collections');
+        $this->get('/admin/collections')->assertOk()->assertSee('company-one');
     }
 
     public function test_revoked_membership_and_collector_access_are_scoped(): void
     {
         $user = User::factory()->create();
         $membership = $this->adminMembership($user);
-        $this->actingAs($user)->get('/dashboard')->assertOk();
+        $this->actingAs($user)->get('/dashboard')->assertRedirect('/admin/collections');
         $membership->delete();
         $this->get('/dashboard')->assertForbidden();
         $this->assertNull(session('active_tenant_id'));
 
         $this->adminMembership($user, 'collector-company', 'collector');
-        $this->get('/dashboard')->assertOk();
+        $this->get('/dashboard')->assertRedirect('/admin/collections');
         $this->get('/admin/users')->assertForbidden();
     }
 

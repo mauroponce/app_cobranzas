@@ -18,7 +18,18 @@ class CollectionVisit extends Model
         return ['scheduled_amount' => 'decimal:2', 'obligation_snapshot' => 'array', 'recorded_at' => 'datetime', 'received_at' => 'datetime'];
     }
 
-    public function route(): BelongsTo { return $this->belongsTo(CollectionRoute::class, 'route_id'); }
-    public function customer(): BelongsTo { return $this->belongsTo(Customer::class); }
-    public function sale(): BelongsTo { return $this->belongsTo(Sale::class); }
+    public function route(): BelongsTo
+    {
+        return $this->belongsTo(CollectionRoute::class, 'route_id');
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
+    public function sale(): BelongsTo
+    {
+        return $this->belongsTo(Sale::class);
+    }
 }

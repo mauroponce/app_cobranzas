@@ -61,6 +61,16 @@ export function formatMoney(minorUnits: string | null): string {
   return `${sign}$ ${whole},${(absolute % 100n).toString().padStart(2, '0')}`;
 }
 
+export function formatMoneyFromMajor(majorUnits: string | null): string {
+  if (majorUnits === null) return '—';
+  const normalized = majorUnits.trim();
+  if (!/^-?\d+(\.\d{1,2})?$/.test(normalized)) return '—';
+  const negative = normalized.startsWith('-');
+  const [whole, fraction = ''] = normalized.replace('-', '').split('.');
+  const cents = BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0'));
+  return formatMoney((negative ? -cents : cents).toString());
+}
+
 export function formatDate(date: Date): string {
   return new Intl.DateTimeFormat('es-AR', {
     timeZone: APP_TIME_ZONE,

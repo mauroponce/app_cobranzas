@@ -68,7 +68,11 @@ const database = {
         tenant_id: tenantId,
         user_id: userId,
         device_id: deviceId,
-        type: sql.includes("'collection_declaration'") ? 'collection_declaration' : 'cash_payment',
+        type: sql.includes("'collection_declaration'")
+          ? 'collection_declaration'
+          : sql.includes("'visit_outcome'")
+            ? 'visit_outcome'
+            : 'cash_payment',
         payload,
         recorded_at: recordedAt,
         status: 'pending',
@@ -125,6 +129,12 @@ const database = {
       if (row) Object.assign(row, { status, payment_id: paymentId, result });
       return;
     }
+    if (sql.startsWith('UPDATE authorized_route_stops SET status')) {
+      const [scope, visitId] = parameters;
+      const row = state.routeStops.get(`${scope}:${visitId}`);
+      if (row && row.status === 'pending') Object.assign(row, { status: 'recorded', outcome: 'no_payment' });
+      return;
+    }
     if (sql.startsWith('INSERT OR REPLACE INTO app_metadata')) {
       state.metadata.set(String(parameters[0]), String(parameters[1]));
       return;
@@ -168,11 +178,12 @@ const database = {
       return;
     }
     if (sql.includes('authorized_obligations')) {
-      const [scope, id, customerId, amount, dueDate, entryType] = parameters as string[];
+      const [scope, id, customerId, saleId, amount, dueDate, entryType] = parameters as string[];
       state.obligations.set(`${scope}:${id}`, {
         scope_key: scope,
         id,
         customer_id: customerId,
+        sale_id: saleId,
         outstanding_amount: amount,
         due_date: dueDate,
         entry_type: entryType,
@@ -184,29 +195,45 @@ const database = {
         scope,
         id,
         customerId,
+        saleId,
         customerName,
         sequence,
         status,
         outcome,
         address,
-        dueAmountCents,
+        saleDueAmountCents,
+        customerTotalOutstandingCents,
+        availableObligationIds,
       ] = parameters as string[];
       state.routeStops.set(`${scope}:${id}`, {
         scope_key: scope,
         id,
         customer_id: customerId,
+        sale_id: saleId,
         customer_name: customerName,
         sequence,
         status,
         outcome,
         address,
-        due_amount_cents: dueAmountCents,
+        sale_due_amount_cents: saleDueAmountCents,
+        customer_total_outstanding_cents: customerTotalOutstandingCents,
+        available_obligation_ids: availableObligationIds,
       });
       return;
     }
     if (sql.includes('authorized_routes')) {
-      const [scope, id, status, routeDate] = parameters as string[];
-      state.routes.set(scope, { scope_key: scope, id, status, route_date: routeDate });
+      const [scope, id, status, routeDate, settlementId, settlementStatus, declaredCash, receivedCash] =
+        parameters as string[];
+      state.routes.set(scope, {
+        scope_key: scope,
+        id,
+        status,
+        route_date: routeDate,
+        settlement_id: settlementId,
+        settlement_status: settlementStatus,
+        declared_cash_cents: declaredCash,
+        received_cash_cents: receivedCash,
+      });
       return;
     }
     throw new Error(`Unsupported SQL: ${sql}`);
@@ -245,6 +272,10 @@ const database = {
         (row) => row.scope_key === scope && (!customer || row.customer_id === customer),
       ) as T[];
     }
+    if (sql.includes('FROM authorized_route_stops')) {
+      const [scope] = parameters;
+      return values(state.routeStops).filter((row) => row.scope_key === scope) as T[];
+    }
     throw new Error(`Unsupported query: ${sql}`);
   },
   getFirstAsync: async <T>(sql: string, ...parameters: unknown[]): Promise<T | null> => {
@@ -259,9 +290,14 @@ const database = {
           (row) =>
             row.tenant_id === String(scope).split(':')[0] &&
             row.user_id === String(scope).split(':')[1] &&
-            ['pending', 'retryable'].includes(String(row.status)),
+            ['pending', 'retryable', 'manual_retry', 'blocked_auth', 'blocked_authorization'].includes(
+              String(row.status),
+            ),
         ).length,
       } as T;
+    }
+    if (sql.includes('FROM authorized_routes')) {
+      return (clone(state.routes.get(String(parameters[0]))) as T | undefined) ?? null;
     }
     throw new Error(`Unsupported query: ${sql}`);
   },

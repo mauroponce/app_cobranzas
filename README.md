@@ -1,6 +1,6 @@
 # App Cobranzas
 
-SaaS multiempresa con panel administrativo, app móvil inicial y módulo comercial de clientes, catálogo, precios y presupuestos. Las ventas definitivas, cuotas y cobranzas todavía no están implementadas.
+SaaS multiempresa con panel administrativo, aplicación móvil de cobradores y módulos de clientes, catálogo, presupuestos, ventas, cuotas y cobranzas conciliadas por empresa.
 
 ## Requisitos
 
@@ -58,7 +58,7 @@ La base `app_cobranzas_test` se crea al inicializar el volumen PostgreSQL. Si ya
 
 ## API
 
-`GET /api/v1/health` es público. Con un token Sanctum, `/me` muestra la identidad global; `/tenants`, `/tenant/select`, `/permissions` y `/profile` permiten seleccionar y validar la empresa por token. Todavía no existe emisión de tokens desde el móvil. Consultá [el contrato](packages/api-contract/README.md).
+`GET /api/v1/health` es público. Con un token Sanctum, `/me` muestra la identidad global; `/tenants`, `/tenant/select`, `/permissions` y `/profile` permiten seleccionar y validar la empresa por token. El móvil inicia sesión, registra el dispositivo y sincroniza declaraciones y resultados mediante una outbox persistente. Consultá [el contrato](packages/api-contract/README.md).
 
 ## App móvil
 
@@ -66,11 +66,11 @@ Desde `apps/mobile`, ejecutá `npm ci`, copiá `.env.example` a `.env` y luego `
 
 `EXPO_PUBLIC_API_URL` debe apuntar al backend desde el dispositivo: `http://10.0.2.2:8080` en el emulador Android; `http://localhost:8080` en el simulador iOS; `http://IP_LAN_DEL_EQUIPO:8080` en un dispositivo físico conectado a la misma red. Para dispositivos físicos fuera del entorno local configurá HTTPS y una URL alcanzable. El botón de configuración permite comprobar el healthcheck.
 
-Ejecutá `npm run typecheck`, `npm run lint` y `npm run format:check` dentro de `apps/mobile`. En el backend, `make test` y `docker compose exec app ./vendor/bin/pint --test`.
+Ejecutá `npm run typecheck`, `npm run lint`, `npm run format:check` y `npm test -- --runInBand` dentro de `apps/mobile`. En el backend, `make test` y `docker compose exec app ./vendor/bin/pint --test`.
 
 ## Estado funcional
 
-El dashboard sigue `docs/design/admin-mockup.html` e incluye login, selección de empresa, usuarios con filtros y paginación, cambios de rol y estado, transferencia de propiedad, invitaciones por correo con aceptación, configuración de empresa y área `/platform`. Las capacidades se verifican en servidor y los módulos comerciales de clientes, productos y presupuestos están disponibles. El seeder local crea Trotamundos y cuentas ficticias de todos los roles. La app móvil incluye cinco pestañas nativas, pantallas de detalle, formularios visuales deshabilitados hasta contar con API y un tema claro/oscuro documentado en [el sistema visual móvil](docs/design/mobile-design-system.md). No hay datos financieros simulados ni lógica de cobro.
+El dashboard incluye gestión multiempresa, módulos comerciales y la operación de cobranzas. Administración programa hojas, revisa declaraciones e incidencias y dispone de APIs autorizadas para reasignar visitas y conciliar transferencias y rendiciones. La aplicación móvil del cobrador inicia hojas, conserva declaraciones y resultados offline, muestra estados de sincronización y presenta la rendición con datos reales. Las declaraciones no reducen deuda hasta su conciliación; el efectivo solo se confirma al recibir la rendición de la misma hoja.
 
 ## Módulo comercial
 

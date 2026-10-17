@@ -17,11 +17,14 @@ export function initializeDatabase(): Promise<SQLite.SQLiteDatabase> {
         await database.execAsync('ALTER TABLE offline_outbox ADD COLUMN next_attempt_at TEXT');
       } catch {}
       await database.execAsync(`CREATE TABLE IF NOT EXISTS authorized_obligations (
-        scope_key TEXT NOT NULL, id TEXT NOT NULL, customer_id TEXT NOT NULL, outstanding_amount TEXT NOT NULL,
+        scope_key TEXT NOT NULL, id TEXT NOT NULL, customer_id TEXT NOT NULL, sale_id TEXT, outstanding_amount TEXT NOT NULL,
         due_date TEXT, entry_type TEXT, PRIMARY KEY (scope_key, id)
       )`);
       try {
         await database.execAsync('ALTER TABLE authorized_obligations ADD COLUMN entry_type TEXT');
+      } catch {}
+      try {
+        await database.execAsync('ALTER TABLE authorized_obligations ADD COLUMN sale_id TEXT');
       } catch {}
       await database.execAsync(`CREATE TABLE IF NOT EXISTS authorized_customers (
         scope_key TEXT NOT NULL, id TEXT NOT NULL, name TEXT NOT NULL, status TEXT NOT NULL, updated_at TEXT,
@@ -37,16 +40,38 @@ export function initializeDatabase(): Promise<SQLite.SQLiteDatabase> {
         amount TEXT NOT NULL, status TEXT NOT NULL, payment_id TEXT, recorded_at TEXT NOT NULL, result TEXT
       )`);
       await database.execAsync(`CREATE TABLE IF NOT EXISTS authorized_route_stops (
-        scope_key TEXT NOT NULL, id TEXT NOT NULL, customer_id TEXT NOT NULL, customer_name TEXT NOT NULL,
-        sequence INTEGER NOT NULL, status TEXT NOT NULL, outcome TEXT, address TEXT, due_amount_cents TEXT,
+        scope_key TEXT NOT NULL, id TEXT NOT NULL, customer_id TEXT NOT NULL, sale_id TEXT, customer_name TEXT NOT NULL,
+        sequence INTEGER NOT NULL, status TEXT NOT NULL, outcome TEXT, address TEXT, sale_due_amount_cents TEXT,
+        customer_total_outstanding_cents TEXT, available_obligation_ids TEXT,
         PRIMARY KEY (scope_key, id)
       )`);
       try {
         await database.execAsync('ALTER TABLE authorized_route_stops ADD COLUMN outcome TEXT');
       } catch {}
+      for (const column of [
+        'sale_id TEXT',
+        'sale_due_amount_cents TEXT',
+        'customer_total_outstanding_cents TEXT',
+        'available_obligation_ids TEXT',
+      ]) {
+        try {
+          await database.execAsync(`ALTER TABLE authorized_route_stops ADD COLUMN ${column}`);
+        } catch {}
+      }
       await database.execAsync(`CREATE TABLE IF NOT EXISTS authorized_routes (
-        scope_key TEXT PRIMARY KEY NOT NULL, id TEXT NOT NULL, status TEXT NOT NULL, route_date TEXT NOT NULL
+        scope_key TEXT PRIMARY KEY NOT NULL, id TEXT NOT NULL, status TEXT NOT NULL, route_date TEXT NOT NULL,
+        settlement_id TEXT, settlement_status TEXT, declared_cash_cents TEXT, received_cash_cents TEXT
       )`);
+      for (const column of [
+        'settlement_id TEXT',
+        'settlement_status TEXT',
+        'declared_cash_cents TEXT',
+        'received_cash_cents TEXT',
+      ]) {
+        try {
+          await database.execAsync(`ALTER TABLE authorized_routes ADD COLUMN ${column}`);
+        } catch {}
+      }
       return database;
     })
     .catch((error: unknown) => {

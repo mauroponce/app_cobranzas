@@ -8,7 +8,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { ListScreen } from '../../components/Screen';
 import { SectionTitle } from '../../components/SectionTitle';
 import { SurfaceCard } from '../../components/SurfaceCard';
-import { formatDateTime } from '../../data/collectorData';
+import { formatDateTime, formatMoneyFromMajor } from '../../data/collectorData';
 import {
   payments,
   pendingCount,
@@ -113,7 +113,7 @@ export function CollectionsScreen() {
         }
         renderItem={({ item }) => (
           <SurfaceCard>
-            <Text variant="titleMedium">$ {item.amount}</Text>
+            <Text variant="titleMedium">{formatMoneyFromMajor(item.amount)}</Text>
             <Text>{statusMessage(item)}</Text>
             <Text variant="bodySmall">
               {formatDateTime(item.recorded_at)} · operación {item.operation_id}

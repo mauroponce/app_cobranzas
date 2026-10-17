@@ -10,10 +10,10 @@ class CashSettlementItem extends Model
 {
     use BelongsToTenant, HasUuids;
 
-    protected $fillable = ['tenant_id', 'settlement_id', 'payment_id', 'amount'];
+    protected $fillable = ['tenant_id', 'settlement_id', 'declaration_component_id', 'payment_id', 'amount', 'received_amount'];
 
     protected function casts(): array
     {
-        return ['amount' => 'decimal:2'];
+        return ['amount' => 'decimal:2', 'received_amount' => 'decimal:2'];
     }
 }

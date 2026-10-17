@@ -23,6 +23,13 @@ igual devuelve el resultado persistido y nunca duplica la declaración.
 La declaración no reduce deuda. La transferencia pura se concilia de forma
 individual; el efectivo y los cobros combinados esperan la rendición de la hoja.
 
+Los resultados sin pago también viajan por la outbox como `visit_outcome`. Un
+rechazo financiero por dispositivo revocado, visita reasignada o hoja cerrada
+queda como `pending_review` en el dispositivo y genera una
+`collection_incident`; no se elimina ni modifica saldos. El tipo heredado
+`cash_payment` se acepta solo para devolver un resultado idempotente de revisión
+y conservar evidencia, pero nunca crea ni confirma un pago.
+
 ## Actualización del panel por SSE
 
 El panel administrativo abre `GET /admin/collections/stream` mediante

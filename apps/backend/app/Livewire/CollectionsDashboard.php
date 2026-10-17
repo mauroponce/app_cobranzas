@@ -6,10 +6,10 @@ use App\Domain\Collections\CollectionRouteService;
 use App\Domain\Collections\PaymentService;
 use App\Domain\Tenancy\LivewireTenantContext;
 use App\Livewire\Concerns\ResolvesTenantContext;
+use App\Models\AuditEvent;
 use App\Models\CollectionDeclaration;
 use App\Models\CollectionIncident;
 use App\Models\CollectionRoute;
-use App\Models\AuditEvent;
 use App\Models\Sale;
 use App\Models\TenantMembership;
 use Illuminate\Contracts\View\View;
@@ -21,8 +21,11 @@ class CollectionsDashboard extends Component
     use ResolvesTenantContext { mount as resolveTenantContext; }
 
     public string $activeTab = 'transfers';
+
     public string $collectorMembershipId = '';
+
     public string $routeDate = '';
+
     /** @var list<string> */
     public array $saleIds = [];
 
@@ -52,6 +55,7 @@ class CollectionsDashboard extends Component
         abort_unless(in_array($tab, ['transfers', 'routes', 'incidents', 'activity'], true), 404);
         $this->activeTab = $tab;
     }
+
     public function approve(string $declarationId, PaymentService $payments): void
     {
         Gate::authorize('payments.verify');

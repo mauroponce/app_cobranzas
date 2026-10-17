@@ -76,7 +76,7 @@ class MobileSyncPushIntegrationTest extends TestCase
         return $this->withToken($token)->postJson('/api/v1/sync/push', ['device_id' => $device, 'operations' => $operations]);
     }
 
-    public function test_valid_push_is_idempotent_and_returns_the_persisted_result_after_a_lost_response(): void
+    public function test_legacy_cash_push_is_preserved_but_never_confirmed_and_is_idempotent(): void
     {
         $owner = $this->member('owner');
         $customer = $this->customer($owner);
@@ -86,11 +86,12 @@ class MobileSyncPushIntegrationTest extends TestCase
         $operation = $this->operation($customer, '10.00', null, $entry);
         $first = $this->push($token, $device, $operation)->assertOk()->json('data.operations.0');
         $retry = $this->push($token, $device, $operation)->assertOk()->json('data.operations.0');
-        $this->assertSame('applied', $first['status']);
-        $this->assertSame($first, $retry);
-        $this->assertDatabaseCount('payments', 1);
+        $this->assertSame('pending_review', $first['status']);
+        $this->assertEquals($first, $retry);
+        $this->assertDatabaseCount('payments', 0);
         $this->assertDatabaseCount('mobile_sync_operations', 1);
-        $this->assertSame('0.00', $entry->fresh()->outstanding_amount);
+        $this->assertDatabaseCount('collection_incidents', 1);
+        $this->assertSame('10.00', $entry->fresh()->outstanding_amount);
     }
 
     public function test_same_uuid_with_different_payload_is_rejected_without_a_second_payment(): void
@@ -101,38 +102,37 @@ class MobileSyncPushIntegrationTest extends TestCase
         $token = $this->token($owner);
         $device = $this->device($owner, $token);
         $id = (string) Str::uuid();
-        $this->push($token, $device, $this->operation($customer, '10.00', $id))->assertJsonPath('data.operations.0.status', 'applied');
+        $this->push($token, $device, $this->operation($customer, '10.00', $id))->assertJsonPath('data.operations.0.status', 'pending_review');
         $this->push($token, $device, $this->operation($customer, '11.00', $id))->assertJsonPath('data.operations.0.status', 'rejected');
-        $this->assertDatabaseCount('payments', 1);
+        $this->assertDatabaseCount('payments', 0);
     }
 
-    public function test_partial_and_overpayment_preserve_balances_and_register_credit(): void
+    public function test_legacy_partial_and_overpayment_never_change_balances_or_create_credit(): void
     {
         $owner = $this->member('owner');
         $customer = $this->customer($owner);
         $entry = $this->entry($owner, $customer, '10.00');
         $token = $this->token($owner);
         $device = $this->device($owner, $token);
-        $this->push($token, $device, $this->operation($customer, '4.00', null, $entry))->assertJsonPath('data.operations.0.status', 'applied');
-        $this->assertSame('6.00', $entry->fresh()->outstanding_amount);
-        $this->push($token, $device, $this->operation($customer, '10.00'))->assertJsonPath('data.operations.0.status', 'applied');
-        $this->assertSame('0.00', $entry->fresh()->outstanding_amount);
-        $this->assertDatabaseHas('customer_credits', ['tenant_id' => $owner->tenant_id, 'customer_id' => $customer->id, 'remaining_amount' => '4.00']);
-        $this->assertSame('14.00', (string) DB::table('payments')->sum('amount'));
-        $this->assertSame('10.00', (string) DB::table('payment_allocations')->sum('amount'));
+        $this->push($token, $device, $this->operation($customer, '4.00', null, $entry))->assertJsonPath('data.operations.0.status', 'pending_review');
+        $this->push($token, $device, $this->operation($customer, '10.00'))->assertJsonPath('data.operations.0.status', 'pending_review');
+        $this->assertSame('10.00', $entry->fresh()->outstanding_amount);
+        $this->assertDatabaseCount('customer_credits', 0);
+        $this->assertDatabaseCount('payments', 0);
+        $this->assertDatabaseCount('payment_allocations', 0);
     }
 
-    public function test_second_payment_for_a_settled_entry_is_under_review_without_overallocation(): void
+    public function test_repeated_legacy_payments_remain_under_review_without_allocation(): void
     {
         $owner = $this->member('owner');
         $customer = $this->customer($owner);
         $entry = $this->entry($owner, $customer, '10.00');
         $token = $this->token($owner);
         $device = $this->device($owner, $token);
-        $this->push($token, $device, $this->operation($customer, '10.00', null, $entry))->assertJsonPath('data.operations.0.status', 'applied');
-        $this->push($token, $device, $this->operation($customer, '10.00', null, $entry))->assertJsonPath('data.operations.0.status', 'under_review');
-        $this->assertSame('0.00', $entry->fresh()->outstanding_amount);
-        $this->assertSame('10.00', (string) DB::table('payment_allocations')->sum('amount'));
+        $this->push($token, $device, $this->operation($customer, '10.00', null, $entry))->assertJsonPath('data.operations.0.status', 'pending_review');
+        $this->push($token, $device, $this->operation($customer, '10.00', null, $entry))->assertJsonPath('data.operations.0.status', 'pending_review');
+        $this->assertSame('10.00', $entry->fresh()->outstanding_amount);
+        $this->assertSame('0', (string) DB::table('payment_allocations')->sum('amount'));
     }
 
     public function test_unknown_device_and_other_tenant_device_are_forbidden(): void
@@ -157,11 +157,11 @@ class MobileSyncPushIntegrationTest extends TestCase
         $token = $this->token($collector);
         $device = $this->device($collector, $token);
         DB::table('mobile_devices')->where('id', $device)->update(['revoked_at' => now()]);
-        $this->push($token, $device, $this->operation($customer))->assertJsonPath('data.operations.0.status', 'under_review')->assertJsonPath('data.operations.0.reason', 'device_revoked');
+        $this->push($token, $device, $this->operation($customer))->assertJsonPath('data.operations.0.status', 'pending_review')->assertJsonPath('data.operations.0.reason', 'legacy_flow_disabled');
         $activeDevice = $this->device($collector, $token);
         app(AuthorizationManagementService::class)->setOverride($owner->tenant, $owner->user, $collector, Permission::where('key', 'payments.create')->firstOrFail(), 'deny', null);
-        $this->push($token, $activeDevice, $this->operation($customer))->assertJsonPath('data.operations.0.status', 'under_review');
-        $this->assertDatabaseCount('payment_conflicts', 2);
+        $this->push($token, $activeDevice, $this->operation($customer))->assertJsonPath('data.operations.0.status', 'pending_review');
+        $this->assertDatabaseCount('collection_incidents', 2);
     }
 
     public function test_suspended_membership_and_disabled_feature_are_forbidden_before_financial_processing(): void
@@ -176,8 +176,8 @@ class MobileSyncPushIntegrationTest extends TestCase
         $owner->update(['status' => 'active']);
         $feature = TenantFeature::where('tenant_id', $owner->tenant_id)->whereHas('feature', fn ($query) => $query->where('key', 'collections'))->firstOrFail();
         app(AuthorizationManagementService::class)->setFeature($owner->tenant, $owner->user, $feature, false);
-        $this->push($token, $device, $this->operation($customer))->assertJsonPath('data.operations.0.status', 'under_review');
-        $this->assertDatabaseCount('payments', 1);
+        $this->push($token, $device, $this->operation($customer))->assertJsonPath('data.operations.0.status', 'pending_review');
+        $this->assertDatabaseCount('payments', 0);
     }
 
     public function test_own_payment_scope_is_denied_even_if_the_collector_was_the_seller(): void
@@ -190,10 +190,10 @@ class MobileSyncPushIntegrationTest extends TestCase
         app(AuthorizationManagementService::class)->setOverride($owner->tenant, $owner->user, $collector, Permission::where('key', 'payments.create')->firstOrFail(), 'allow', 'own');
         $token = $this->token($collector);
         $device = $this->device($collector, $token);
-        $this->push($token, $device, $this->operation($customer, '10.00', null, $entry))->assertJsonPath('data.operations.0.status', 'rejected');
+        $this->push($token, $device, $this->operation($customer, '10.00', null, $entry))->assertJsonPath('data.operations.0.status', 'pending_review');
         $foreign = $this->member('owner');
         $foreignCustomer = $this->customer($foreign);
-        $this->push($token, $device, $this->operation($foreignCustomer))->assertJsonPath('data.operations.0.status', 'rejected');
+        $this->push($token, $device, $this->operation($foreignCustomer))->assertJsonPath('data.operations.0.status', 'pending_review');
         $this->assertSame('10.00', $entry->fresh()->outstanding_amount);
         $this->assertDatabaseCount('payments', 0);
     }
@@ -208,9 +208,9 @@ class MobileSyncPushIntegrationTest extends TestCase
         $invalid = $this->operation($customer, '0.00');
         $valid = $this->operation($customer, '10.00', null, $entry);
         $response = $this->push($token, $device, $valid, $invalid)->assertOk();
-        $response->assertJsonPath('data.operations.0.status', 'applied')->assertJsonPath('data.operations.1.status', 'rejected');
-        $this->assertDatabaseCount('payments', 1);
-        $this->assertSame('0.00', $entry->fresh()->outstanding_amount);
+        $response->assertJsonPath('data.operations.0.status', 'pending_review')->assertJsonPath('data.operations.1.status', 'pending_review');
+        $this->assertDatabaseCount('payments', 0);
+        $this->assertSame('10.00', $entry->fresh()->outstanding_amount);
     }
 
     public function test_postgresql_unique_operation_index_serializes_two_independent_connections(): void

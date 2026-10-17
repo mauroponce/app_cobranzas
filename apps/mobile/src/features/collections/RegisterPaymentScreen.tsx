@@ -23,8 +23,9 @@ function rejectionReason(result: string | null): string {
 
 export function RegisterPaymentScreen({ navigation, route }: Props) {
   const { state } = useAuth();
-  const [method, setMethod] = useState<'cash' | 'bank_transfer'>('cash');
+  const [method, setMethod] = useState<'cash' | 'bank_transfer' | 'combined'>('cash');
   const [amount, setAmount] = useState('');
+  const [transferAmount, setTransferAmount] = useState('');
   const [reference, setReference] = useState('');
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
@@ -34,7 +35,9 @@ export function RegisterPaymentScreen({ navigation, route }: Props) {
       setMessage('La sesión no está disponible. Volvé a ingresar antes de registrar el cobro.');
       return;
     }
-    if (!/^\d+(\.\d{1,2})?$/.test(amount) || amount === '0') {
+    const validAmount = (value: string) =>
+      /^\d+(\.\d{1,2})?$/.test(value) && !/^0+(\.0{1,2})?$/.test(value);
+    if (!validAmount(amount) || (method === 'combined' && !validAmount(transferAmount))) {
       setMessage('Ingresá un importe mayor que cero, con hasta dos decimales.');
       return;
     }
@@ -55,10 +58,21 @@ export function RegisterPaymentScreen({ navigation, route }: Props) {
         recordedAt,
         payload: {
           visit_id: route.params.visitId,
-          components: [{ method, amount, reference: reference || undefined }],
+          components:
+            method === 'combined'
+              ? [
+                  { method: 'cash', amount },
+                  {
+                    method: 'bank_transfer',
+                    amount: transferAmount,
+                    reference: reference || undefined,
+                  },
+                ]
+              : [{ method, amount, reference: reference || undefined }],
         },
       });
       setAmount('');
+      setTransferAmount('');
       setReference('');
 
       try {
@@ -103,18 +117,29 @@ export function RegisterPaymentScreen({ navigation, route }: Props) {
       </Text>
       <RadioButton.Group
         value={method}
-        onValueChange={(value) => setMethod(value as 'cash' | 'bank_transfer')}
+        onValueChange={(value) => setMethod(value as 'cash' | 'bank_transfer' | 'combined')}
       >
         <RadioButton.Item label="Efectivo" value="cash" />
         <RadioButton.Item label="Transferencia" value="bank_transfer" />
+        <RadioButton.Item label="Efectivo y transferencia" value="combined" />
       </RadioButton.Group>
       <TextInput
-        label="Importe recibido (ARS)"
+        label={method === 'combined' ? 'Efectivo recibido (ARS)' : 'Importe recibido (ARS)'}
         value={amount}
         onChangeText={(value) => setAmount(value.replace(',', '.').replace(/[^0-9.]/g, ''))}
         keyboardType="decimal-pad"
       />
-      {method === 'bank_transfer' ? (
+      {method === 'combined' ? (
+        <TextInput
+          label="Transferencia recibida (ARS)"
+          value={transferAmount}
+          onChangeText={(value) =>
+            setTransferAmount(value.replace(',', '.').replace(/[^0-9.]/g, ''))
+          }
+          keyboardType="decimal-pad"
+        />
+      ) : null}
+      {method !== 'cash' ? (
         <TextInput label="Referencia opcional" value={reference} onChangeText={setReference} />
       ) : null}
       {message ? <Text>{message}</Text> : null}

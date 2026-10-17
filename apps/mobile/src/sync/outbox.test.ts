@@ -1,5 +1,9 @@
 import { initializeDatabase } from '../database/database';
-import { queueOfflineCashPayment, queueOfflineCollectionDeclaration } from './outbox';
+import {
+  queueOfflineCashPayment,
+  queueOfflineCollectionDeclaration,
+  queueOfflineVisitOutcome,
+} from './outbox';
 import { resetSqliteMock, sqliteRows } from '../../test/sqliteMock';
 
 const payment = (overrides = {}) => ({
@@ -53,7 +57,7 @@ describe('offline cash outbox', () => {
     expect(sqliteRows().payments.get('declaration-1')).toMatchObject({
       customer_id: 'customer-a',
       amount: '125.50',
-      status: 'pending',
+      status: 'pending_sync',
     });
 
     await queueOfflineCollectionDeclaration({
@@ -88,6 +92,22 @@ describe('offline cash outbox', () => {
     expect(sqliteRows().outbox.size).toBe(0);
     expect(sqliteRows().payments.size).toBe(0);
     spy.mockRestore();
+  });
+
+  it('keeps a no-payment visit outcome in the persistent outbox', async () => {
+    await queueOfflineVisitOutcome({
+      operationId: 'outcome-1',
+      tenantId: 'tenant-a',
+      userId: 'user-a',
+      deviceId: 'device-a',
+      recordedAt: '2026-10-12T00:02:00.000Z',
+      payload: { visit_id: 'visit-a', reason: 'other', notes: 'Domicilio cerrado' },
+    });
+
+    expect(sqliteRows().outbox.get('outcome-1')).toMatchObject({
+      type: 'visit_outcome',
+      status: 'pending',
+    });
   });
 
   it('keeps pending data across another database initialization and separates tenants', async () => {

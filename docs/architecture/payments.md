@@ -12,10 +12,15 @@ declaración queda pendiente y no reduce el saldo exigible ni la deuda definitiv
 Una visita realizada con pago puede recibir varias declaraciones mientras la
 hoja continúe en curso; cada operación mantiene identidad, importe, medio y
 conciliación independientes.
-Una transferencia sin efectivo puede conciliarse individualmente desde el
-panel; el efectivo y las declaraciones combinadas se resuelven durante la
-rendición. El panel lista todos esos estados y recibe una invalidación SSE luego
+Cada transferencia se concilia por componente, incluso dentro de una
+declaración combinada. El efectivo se resuelve exclusivamente durante la
+rendición de la hoja. El panel lista todos esos estados y recibe una invalidación SSE luego
 del commit de cada nueva declaración.
+
+Los pagos administrativos directos son un flujo distinto. El endpoint general
+no permite que un rol cobrador confirme efectivo; la sincronización heredada
+`cash_payment` tampoco crea pagos. Si reaparece una operación heredada, se
+conserva como incidencia para revisión.
 
 ## Alcance de clientes en cobranzas
 

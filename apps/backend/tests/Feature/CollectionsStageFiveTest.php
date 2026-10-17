@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Domain\Collections\CashSettlementService;
 use App\Domain\Collections\CollectionAssignmentService;
+use App\Domain\Collections\CollectionRouteService;
+use App\Domain\Collections\CollectionWorkflowService;
 use App\Domain\Collections\PaymentService;
 use App\Domain\Tenancy\AuthorizationManagementService;
 use App\Domain\Tenancy\AuthorizationService;
@@ -17,6 +19,7 @@ use App\Models\TenantMembership;
 use App\Models\User;
 use Database\Seeders\AuthorizationCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -94,11 +97,17 @@ class CollectionsStageFiveTest extends TestCase
         $owner = $this->member('owner');
         $collector = $this->member('collector', $owner->tenant);
         $customer = $this->customer($owner);
-        $this->obligation($owner, $customer, '10.00');
+        $entry = $this->obligation($owner, $customer, '10.00');
         app(CollectionAssignmentService::class)->assign($owner->tenant, $owner->user, $customer, $collector);
-        $payment = app(PaymentService::class)->registerCash($owner->tenant, $collector->user, ['customer_id' => $customer->id, 'amount' => '10.00']);
+        $route = app(CollectionRouteService::class)->program($owner->tenant, $owner->user, $collector->id, today()->toDateString(), [$entry->sale_id]);
+        app(CollectionWorkflowService::class)->startRoute($owner->tenant, $collector->user, $route);
+        $declaration = app(CollectionWorkflowService::class)->declare($owner->tenant, $collector->user, [
+            'visit_id' => $route->visits->first()->id, 'operation_id' => (string) Str::uuid(),
+            'components' => [['method' => 'cash', 'amount' => '10.00']],
+        ]);
+        $this->assertSame('10.00', $entry->fresh()->outstanding_amount);
         $settlements = app(CashSettlementService::class);
-        $settlement = $settlements->create($owner->tenant, $collector->user, [['payment_id' => $payment->id, 'amount' => '10.00']]);
+        $settlement = $settlements->createForRoute($owner->tenant, $collector->user, $route, true);
         $settlement = $settlements->submit($owner->tenant, $collector->user, $settlement);
         app(AuthorizationManagementService::class)->setOverride($owner->tenant, $owner->user, $collector, Permission::where('key', 'settlements.approve')->firstOrFail(), 'allow', 'all');
         try {
@@ -107,8 +116,11 @@ class CollectionsStageFiveTest extends TestCase
         } catch (ValidationException) {
         }
         $this->assertTrue(app(AuthorizationService::class)->allows($owner->fresh()->load('tenant'), 'settlements.approve'));
-        $approved = $settlements->approve($owner->tenant, $owner->user, $settlement, '9.00', 'Faltante declarado');
+        $component = $declaration->components()->firstOrFail();
+        $approved = $settlements->approve($owner->tenant, $owner->user, $settlement, '9.00', [$component->id => '9.00'], 'Faltante declarado');
         $this->assertSame('disputed', $approved->status);
-        $this->assertDatabaseHas('cash_discrepancies', ['tenant_id' => $owner->tenant_id, 'settlement_id' => $approved->id, 'declared_amount' => '9.00']);
+        $this->assertDatabaseHas('cash_discrepancies', ['tenant_id' => $owner->tenant_id, 'settlement_id' => $approved->id, 'received_amount' => '9.00']);
+        $this->assertSame('1.00', $entry->fresh()->outstanding_amount);
+        $this->assertDatabaseHas('collection_incidents', ['tenant_id' => $owner->tenant_id, 'route_id' => $route->id, 'type' => 'cash_difference']);
     }
 }

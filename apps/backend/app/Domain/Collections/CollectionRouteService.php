@@ -14,6 +14,7 @@ use App\Models\TenantMembership;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 final class CollectionRouteService
@@ -67,6 +68,54 @@ final class CollectionRouteService
             Audit::record('collection_route.programmed', $route, $actor, $tenant->id, ['sales' => $sales->pluck('id')->all()]);
 
             return $route->fresh('visits');
+        });
+    }
+
+    public function reassignVisit(Tenant $tenant, User $actor, CollectionVisit $visit, string $collectorMembershipId, string $reason): CollectionVisit
+    {
+        $membership = $this->require($tenant, $actor, 'collections.reassign');
+
+        return DB::transaction(function () use ($tenant, $actor, $membership, $visit, $collectorMembershipId, $reason): CollectionVisit {
+            $visit = CollectionVisit::forTenant($tenant)->whereKey($visit->id)->lockForUpdate()->firstOrFail();
+            if ($visit->status !== 'pending') {
+                throw ValidationException::withMessages(['visit' => 'Solo se pueden reasignar visitas pendientes.']);
+            }
+            $sourceRoute = CollectionRoute::forTenant($tenant)->whereKey($visit->route_id)->lockForUpdate()->firstOrFail();
+            $collector = TenantMembership::forTenant($tenant)->whereKey($collectorMembershipId)->where('role', 'collector')->where('status', 'active')->with('user')->lockForUpdate()->firstOrFail();
+            if ($collector->id === $sourceRoute->collector_membership_id) {
+                throw ValidationException::withMessages(['collector_membership_id' => 'La visita ya pertenece a ese cobrador.']);
+            }
+            $targetRoute = CollectionRoute::forTenant($tenant)
+                ->where('collector_membership_id', $collector->id)->whereDate('route_date', $sourceRoute->route_date)
+                ->whereIn('status', ['published', 'in_progress'])->lockForUpdate()->first();
+            if (! $targetRoute) {
+                $targetRoute = CollectionRoute::create([
+                    'tenant_id' => $tenant->id, 'route_date' => $sourceRoute->route_date, 'collector_membership_id' => $collector->id,
+                    'name' => 'Hoja '.$sourceRoute->route_date->toDateString().' — '.$collector->user->name,
+                    'status' => 'published', 'created_by_membership_id' => $membership->id,
+                    'published_by_membership_id' => $membership->id, 'published_at' => now(), 'version' => 1,
+                ]);
+            }
+            $sequence = ((int) $targetRoute->visits()->max('sequence')) + 1;
+            $targetVisit = CollectionVisit::create([
+                'tenant_id' => $tenant->id, 'route_id' => $targetRoute->id, 'sale_id' => $visit->sale_id,
+                'customer_id' => $visit->customer_id, 'sequence' => $sequence, 'status' => 'pending',
+                'scheduled_amount' => $visit->scheduled_amount, 'obligation_snapshot' => $visit->obligation_snapshot,
+            ]);
+            $visit->update(['status' => 'reassigned', 'version' => $visit->version + 1]);
+            $sourceRoute->increment('version');
+            $targetRoute->increment('version');
+            $tenant->increment('authorization_version');
+            DB::table('collection_visit_reassignments')->insert([
+                'id' => (string) Str::uuid(), 'tenant_id' => $tenant->id, 'source_visit_id' => $visit->id,
+                'target_visit_id' => $targetVisit->id, 'from_route_id' => $sourceRoute->id, 'to_route_id' => $targetRoute->id,
+                'from_collector_membership_id' => $sourceRoute->collector_membership_id,
+                'to_collector_membership_id' => $collector->id, 'reason' => $reason,
+                'reassigned_by_user_id' => $actor->id, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+            Audit::record('collection_visit.reassigned', $targetVisit, $actor, $tenant->id, ['source_visit_id' => $visit->id, 'reason' => $reason]);
+
+            return $targetVisit;
         });
     }
 

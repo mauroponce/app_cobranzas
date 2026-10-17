@@ -12,5 +12,8 @@ class CollectionIncident extends Model
 
     protected $fillable = ['tenant_id', 'route_id', 'visit_id', 'declaration_id', 'type', 'status', 'details', 'reported_by', 'resolved_by', 'resolved_at'];
 
-    protected function casts(): array { return ['resolved_at' => 'datetime']; }
+    protected function casts(): array
+    {
+        return ['resolved_at' => 'datetime'];
+    }
 }

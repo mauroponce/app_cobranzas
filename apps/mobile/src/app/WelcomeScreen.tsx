@@ -93,7 +93,7 @@ export function WelcomeScreen() {
               customerId: stop.customer_id,
               customerName: stop.customer_name,
               address: stop.address ?? 'Dirección sin detalle',
-              dueMinor: stop.due_amount_cents,
+              dueMinor: stop.sale_due_amount_cents,
               status: stop.status === 'recorded' ? 'completed' : 'pending',
               onlinePaymentConfirmed: false,
             }}

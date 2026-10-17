@@ -157,11 +157,7 @@ function AppNavigation() {
           <Stack.Screen name="Notifications" component={NotificationsScreen} />
         </Stack.Navigator>
       </NavigationContainer>
-      <Snackbar
-        visible={syncError !== null}
-        onDismiss={() => setSyncError(null)}
-        duration={10000}
-      >
+      <Snackbar visible={syncError !== null} onDismiss={() => setSyncError(null)} duration={10000}>
         {syncError}
       </Snackbar>
     </>

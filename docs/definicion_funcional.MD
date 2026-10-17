@@ -90,6 +90,14 @@ de esa misma hoja. Cada hoja tiene una rendición independiente. Si el efectivo
 recibido difiere de lo declarado, se aprueba solamente el importe recibido y la
 diferencia se registra como incidencia.
 
+La conciliación se registra por componente de la declaración. Una transferencia
+puede confirmarse sin alterar el componente de efectivo de una declaración
+combinada. Cuando el efectivo recibido es menor que el declarado,
+Administración debe indicar expresamente cuánto corresponde a cada componente;
+el sistema no distribuye el faltante. Un excedente sobre las obligaciones de la
+venta queda sin imputar y genera una incidencia hasta su aprobación, sin crear
+automáticamente crédito para cuotas futuras.
+
 ## Sincronización y cierre
 
 Las operaciones móviles usan identificadores únicos y pueden registrarse sin
@@ -101,3 +109,10 @@ Una hoja con resultados aún sin sincronizar no puede rendirse ni cerrarse. Una
 vez cerrada, su resultado original es inmutable. Las diferencias o correcciones
 posteriores se tratan mediante una incidencia y un ajuste nuevo auditado; la
 hoja no se reabre.
+
+La presentación desde el móvil exige que la cola local del usuario esté vacía y
+que todas las visitas de la hoja tengan resultado. El servidor vuelve a validar
+esas condiciones conocidas, crea una única rendición para la hoja y la deja
+presentada. La aprobación administrativa concilia el efectivo atribuido y cierra
+la hoja de forma idempotente. Esta confirmación reduce el riesgo de operaciones
+locales omitidas, pero no afirma conocer dispositivos inaccesibles.

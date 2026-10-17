@@ -11,6 +11,7 @@ export type LocalCustomer = {
 export type LocalObligation = {
   id: string;
   customer_id: string;
+  sale_id: string | null;
   outstanding_amount: string;
   due_date: string | null;
   entry_type: string;
@@ -18,6 +19,7 @@ export type LocalObligation = {
 export type LocalPayment = {
   operation_id: string;
   customer_id: string;
+  sale_id: string | null;
   amount: string;
   status: string;
   recorded_at: string;
@@ -32,9 +34,19 @@ export type LocalRouteStop = {
   status: string;
   outcome: string | null;
   address: string | null;
-  due_amount_cents: string | null;
+  sale_due_amount_cents: string | null;
+  customer_total_outstanding_cents: string | null;
+  available_obligation_ids: string | null;
 };
-export type LocalRoute = { id: string; status: string; route_date: string };
+export type LocalRoute = {
+  id: string;
+  status: string;
+  route_date: string;
+  settlement_id: string | null;
+  settlement_status: string | null;
+  declared_cash_cents: string | null;
+  received_cash_cents: string | null;
+};
 export const scopeKey = (tenantId: string, userId: string) => `${tenantId}:${userId}`;
 
 export async function customers(scope: string): Promise<LocalCustomer[]> {
@@ -47,7 +59,7 @@ export async function customers(scope: string): Promise<LocalCustomer[]> {
 export async function obligations(scope: string, customerId: string): Promise<LocalObligation[]> {
   const db = await initializeDatabase();
   return db.getAllAsync<LocalObligation>(
-    'SELECT id, customer_id, outstanding_amount, due_date, entry_type FROM authorized_obligations WHERE scope_key = ? AND customer_id = ? ORDER BY due_date',
+    'SELECT id, customer_id, sale_id, outstanding_amount, due_date, entry_type FROM authorized_obligations WHERE scope_key = ? AND customer_id = ? ORDER BY due_date',
     scope,
     customerId,
   );
@@ -62,21 +74,21 @@ export async function payments(scope: string): Promise<LocalPayment[]> {
 export async function routeStops(scope: string): Promise<LocalRouteStop[]> {
   const db = await initializeDatabase();
   return db.getAllAsync<LocalRouteStop>(
-    'SELECT id, customer_id, customer_name, sequence, status, outcome, address, due_amount_cents FROM authorized_route_stops WHERE scope_key = ? ORDER BY sequence',
+    'SELECT id, customer_id, sale_id, customer_name, sequence, status, outcome, address, sale_due_amount_cents, customer_total_outstanding_cents, available_obligation_ids FROM authorized_route_stops WHERE scope_key = ? ORDER BY sequence',
     scope,
   );
 }
 export async function route(scope: string): Promise<LocalRoute | null> {
   const db = await initializeDatabase();
   return db.getFirstAsync<LocalRoute>(
-    'SELECT id, status, route_date FROM authorized_routes WHERE scope_key = ?',
+    'SELECT id, status, route_date, settlement_id, settlement_status, declared_cash_cents, received_cash_cents FROM authorized_routes WHERE scope_key = ?',
     scope,
   );
 }
 export async function pendingCount(scope: string): Promise<number> {
   const db = await initializeDatabase();
   const row = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) AS count FROM offline_outbox WHERE tenant_id || ':' || user_id = ? AND status IN ('pending', 'retryable')",
+    "SELECT COUNT(*) AS count FROM offline_outbox WHERE tenant_id || ':' || user_id = ? AND status IN ('pending', 'retryable', 'manual_retry', 'blocked_auth', 'blocked_authorization')",
     scope,
   );
   return row?.count ?? 0;

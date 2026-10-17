@@ -10,7 +10,7 @@ class CashSettlement extends Model
 {
     use BelongsToTenant, HasUuids;
 
-    protected $fillable = ['tenant_id', 'collector_id', 'presented_by_user_id', 'declared_amount', 'approved_amount', 'received_amount', 'status', 'submitted_at', 'presented_at', 'reviewed_by', 'reviewed_at', 'notes'];
+    protected $fillable = ['tenant_id', 'route_id', 'collector_id', 'presented_by_user_id', 'declared_amount', 'approved_amount', 'received_amount', 'status', 'submitted_at', 'presented_at', 'reviewed_by', 'reviewed_at', 'notes'];
 
     protected function casts(): array
     {

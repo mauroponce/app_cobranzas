@@ -117,6 +117,7 @@ async function runSync(session: Session, options: SyncOptions): Promise<void> {
           obligations: {
             id: string;
             customer_id: string;
+            sale_id: string;
             outstanding_amount: string;
             due_date: string | null;
             entry_type: string;
@@ -124,14 +125,27 @@ async function runSync(session: Session, options: SyncOptions): Promise<void> {
           route_stops: {
             id: string;
             customer_id: string;
+            sale_id: string;
             customer_name: string;
             sequence: number;
             status: string;
             outcome: string | null;
             address: string;
-            due_amount_cents: string;
+            sale_due_amount_cents: string;
+            customer_total_outstanding_cents: string;
+            available_obligation_ids: string[];
           }[];
-          route: { id: string; status: string; route_date: string } | null;
+          route: {
+            id: string;
+            status: string;
+            route_date: string;
+            settlement: {
+              id: string | null;
+              status: string;
+              declared_cash_cents: string;
+              received_cash_cents: string | null;
+            } | null;
+          } | null;
           cursor: number;
           has_more: boolean;
           reset?: boolean;
@@ -162,34 +176,42 @@ async function runSync(session: Session, options: SyncOptions): Promise<void> {
           );
         for (const entry of pull.data.obligations)
           await db.runAsync(
-            'INSERT OR REPLACE INTO authorized_obligations (scope_key,id,customer_id,outstanding_amount,due_date,entry_type) VALUES (?,?,?,?,?,?)',
+            'INSERT OR REPLACE INTO authorized_obligations (scope_key,id,customer_id,sale_id,outstanding_amount,due_date,entry_type) VALUES (?,?,?,?,?,?,?)',
             scope,
             entry.id,
             entry.customer_id,
+            entry.sale_id,
             entry.outstanding_amount,
             entry.due_date,
             entry.entry_type,
           );
         for (const stop of pull.data.route_stops ?? [])
           await db.runAsync(
-            'INSERT OR REPLACE INTO authorized_route_stops (scope_key,id,customer_id,customer_name,sequence,status,outcome,address,due_amount_cents) VALUES (?,?,?,?,?,?,?,?,?)',
+            'INSERT OR REPLACE INTO authorized_route_stops (scope_key,id,customer_id,sale_id,customer_name,sequence,status,outcome,address,sale_due_amount_cents,customer_total_outstanding_cents,available_obligation_ids) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
             scope,
             stop.id,
             stop.customer_id,
+            stop.sale_id,
             stop.customer_name,
             stop.sequence,
             stop.status,
             stop.outcome,
             stop.address,
-            stop.due_amount_cents,
+            stop.sale_due_amount_cents,
+            stop.customer_total_outstanding_cents,
+            JSON.stringify(stop.available_obligation_ids),
           );
         if (pull.data.route)
           await db.runAsync(
-            'INSERT INTO authorized_routes (scope_key,id,status,route_date) VALUES (?,?,?,?)',
+            'INSERT INTO authorized_routes (scope_key,id,status,route_date,settlement_id,settlement_status,declared_cash_cents,received_cash_cents) VALUES (?,?,?,?,?,?,?,?)',
             scope,
             pull.data.route.id,
             pull.data.route.status,
             pull.data.route.route_date,
+            pull.data.route.settlement?.id ?? null,
+            pull.data.route.settlement?.status ?? null,
+            pull.data.route.settlement?.declared_cash_cents ?? null,
+            pull.data.route.settlement?.received_cash_cents ?? null,
           );
         await db.runAsync(
           'INSERT OR REPLACE INTO app_metadata (key, value) VALUES (?, ?)',

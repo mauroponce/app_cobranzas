@@ -2,6 +2,10 @@
 
 SaaS multiempresa con panel administrativo, aplicación móvil de cobradores y módulos de clientes, catálogo, presupuestos, ventas, cuotas y cobranzas conciliadas por empresa.
 
+## Seguimiento del proyecto
+
+El [roadmap del producto](ROADMAP.md) es el documento central para consultar prioridades, tareas pendientes, dependencias, criterios de aceptación y evidencia de verificación. Antes de usar `$dev-discovery`, `$dev-plan`, `$dev-implement` o `$dev-review`, se debe contrastar ese roadmap con `AGENTS.md`, el código, Git y la documentación funcional aplicable. Al terminar una implementación, se actualizan solo las tareas afectadas; escribir código no basta para marcarlas como validadas.
+
 ## Requisitos
 
 - Docker Engine y Docker Compose para el backend. No hace falta instalar PHP, Composer ni PostgreSQL en el equipo.

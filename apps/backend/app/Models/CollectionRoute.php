@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class CollectionRoute extends Model
 {
@@ -49,5 +50,10 @@ class CollectionRoute extends Model
     public function visits(): HasMany
     {
         return $this->hasMany(CollectionVisit::class, 'route_id');
+    }
+
+    public function settlement(): HasOne
+    {
+        return $this->hasOne(CashSettlement::class, 'route_id');
     }
 }

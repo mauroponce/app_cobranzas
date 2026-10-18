@@ -1,9 +1,9 @@
 name: Backend
 on:
   push:
-    paths: ['apps/backend/**', 'infra/docker/**', 'compose.yaml', '.github/workflows/backend.yml']
+    paths: ['apps/backend/**', 'infra/docker/**', 'scripts/pilot/**', 'compose*.yaml', '.github/workflows/backend.yml']
   pull_request:
-    paths: ['apps/backend/**', 'infra/docker/**', 'compose.yaml', '.github/workflows/backend.yml']
+    paths: ['apps/backend/**', 'infra/docker/**', 'scripts/pilot/**', 'compose*.yaml', '.github/workflows/backend.yml']
 
 jobs:
   test:
@@ -34,13 +34,13 @@ jobs:
       DB_USERNAME: app_cobranzas
       DB_PASSWORD: testing-only-password
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
           extensions: pdo_pgsql, pgsql, intl, zip, pcntl
           coverage: none
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -50,5 +50,13 @@ jobs:
       - run: php artisan key:generate
       - run: npm ci
       - run: npm run build
-      - run: php artisan test
-      - run: ./vendor/bin/pint --test
+      - run: php artisan test --log-junit storage/logs/junit.xml
+      - if: always()
+        run: ./vendor/bin/pint --test
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-test-results-${{ github.run_id }}
+          path: apps/backend/storage/logs/junit.xml
+          if-no-files-found: warn
+          retention-days: 14

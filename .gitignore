@@ -1,4 +1,7 @@
 /.env
+/.env.pilot
+/var/pilot-backups/
+/infra/pilot/certs/
 /apps/backend/.env
 /apps/backend/vendor/
 /apps/backend/node_modules/

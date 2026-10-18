@@ -72,6 +72,15 @@ Desde `apps/mobile`, ejecutá `npm ci`, copiá `.env.example` a `.env` y luego `
 
 Ejecutá `npm run typecheck`, `npm run lint`, `npm run format:check` y `npm test -- --runInBand` dentro de `apps/mobile`. En el backend, `make test` y `docker compose exec app ./vendor/bin/pint --test`.
 
+## Piloto controlado
+
+La preparación técnica y la puerta **GO / NO-GO** viven en
+[`docs/pilots/c04-readiness.md`](docs/pilots/c04-readiness.md). El directorio
+[`docs/pilots/`](docs/pilots/) contiene el runbook, backup/restauración,
+distribución Android, soporte, capacitación, checklist y plantillas. Que exista
+esa preparación no autoriza desplegar, migrar datos reales, distribuir una APK
+ni registrar dinero real.
+
 ## Estado funcional
 
 El dashboard incluye gestión multiempresa, módulos comerciales y la operación de cobranzas. Administración programa hojas, revisa declaraciones e incidencias y dispone de APIs autorizadas para reasignar visitas y conciliar transferencias y rendiciones. La aplicación móvil del cobrador inicia hojas, conserva declaraciones y resultados offline, muestra estados de sincronización y presenta la rendición con datos reales. Las declaraciones no reducen deuda hasta su conciliación; el efectivo solo se confirma al recibir la rendición de la misma hoja.

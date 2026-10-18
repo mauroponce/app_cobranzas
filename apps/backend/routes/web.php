@@ -7,6 +7,7 @@ use App\Http\Controllers\CollectionDashboardStreamController;
 use App\Http\Controllers\CompanySettingsController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\PilotSupportController;
 use App\Http\Controllers\PlatformTenantController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\SaleController;
@@ -47,6 +48,8 @@ Route::middleware('auth')->group(function (): void {
         Route::view('/admin/collections/portfolios', 'collections.portfolios')->name('collections.portfolios');
         Route::view('/admin/collections/structures', 'collections.structures')->name('collections.structures');
         Route::view('/admin/authorization', 'authorization.index')->name('authorization.index');
+        Route::get('/admin/support', [PilotSupportController::class, 'index'])->name('support.index');
+        Route::post('/admin/support/devices/{device}/revoke', [PilotSupportController::class, 'revokeDevice'])->name('support.devices.revoke');
         Route::get('/admin/users', [TenantUserController::class, 'index'])->name('admin.users');
         Route::get('/admin/users/{membership}', [TenantUserController::class, 'show'])->name('admin.users.show');
         Route::patch('/admin/users/{membership}/role', [TenantUserController::class, 'updateRole'])->name('admin.users.role');

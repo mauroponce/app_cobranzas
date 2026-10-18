@@ -2,7 +2,7 @@
 
 > **Punto único de seguimiento del producto.** Este archivo indica qué hacer ahora, qué sigue, qué está bloqueado y cómo comprobar que una entrega terminó. No reemplaza las definiciones funcionales ni la arquitectura detallada.
 >
-> **Última revisión del roadmap:** 2026-10-17. **Base pública verificada:** `main` y `origin/main` en `c8e939bc2f658590d49253d78b4c8c1baeb8afcd` (commit del 2026-10-17). C-01 y C-02 están integrados, pero no validados: el CI backend del commit vigente falló y aún falta una revisión independiente.
+> **Última revisión del roadmap:** 2026-10-18. **Base pública verificada:** `main` y `origin/main` en `7bf02095dc8d545b1aefa12a763c8673c4b64932` (commit del 2026-10-18). C-01, C-02 y C-03 están integrados, pero no validados: el CI backend del commit vigente falló y aún falta una revisión independiente. C-04 está preparado en la rama `feat/c-04-pilot-readiness`, sin autorizar operación real.
 
 ## 1. Dirección del producto
 
@@ -45,7 +45,7 @@ Si hay contradicción, **no inventar un comportamiento para resolverla**: identi
 | 1 | **C-01** | Estabilización del dominio de cobranzas | P0 | **IMPLEMENTADO / SIN VALIDAR** | Revisión independiente; obtener CI backend verde; repetir verificaciones sobre el commit vigente |
 | 2 | **C-02** | Completar formularios administrativos de diferencias y reasignaciones | P0 | **IMPLEMENTADO / SIN VALIDAR** | C-01 continúa sin validar; falta revisión independiente y CI verde |
 | 3 | **C-03** | Jornada completa y rendición en entorno de pruebas | P0 | **IMPLEMENTADO / SIN VALIDAR** | Revisión independiente; CI backend verde; prueba móvil visual; concurrencia administrativa; migración sobre copia anonimizada representativa |
-| 4 | **C-04** | Piloto controlado de cobranzas con Trotamundo | P0 | **BLOQUEADO** | C-03 y aceptación operativa, soporte y respaldo definidos |
+| 4 | **C-04** | Piloto controlado de cobranzas con Trotamundo | P0 | **IMPLEMENTADO / SIN VALIDAR** | La preparación técnica existe; el piloto real sigue bloqueado por revisión, CI, restore integral, validación móvil, datos y aprobaciones operativas |
 | 5 | **I-01** | Diseñar importación Excel/CSV y saldos de apertura | P1 | **PENDIENTE** | Definir fuentes reales anonimizadas, contratos y criterios de conciliación |
 | 6 | **I-02** | Implementar importación determinística con previsualización | P1 | **BLOQUEADO** | Plan I-01 y dominio financiero estable |
 | 7 | **I-03** | Asistente Gemini para mapeos/documentos ambiguos | P2 | **BLOQUEADO** | I-02 validado; evaluación privacidad, costo y precisión |
@@ -58,9 +58,9 @@ Si hay contradicción, **no inventar un comportamiento para resolverla**: identi
 | 14 | **L-01** | Entregas y repartidor que también recibe dinero | P2 | **BLOQUEADO** | Empresa piloto concreta, discovery fit-gap y M-02 |
 | 15 | **X-01** | Integraciones WhatsApp / Mercado Pago / bancos | P3 | **PENDIENTE** | Casos concretos, permisos, verificación y diseño de idempotencia |
 
-**Contraste de estados del 2026-10-17:** C-01 y C-02 están integrados en `main`, pero conservan `IMPLEMENTADO / SIN VALIDAR` por el CI backend fallido y la revisión pendiente. C-03 ejecutó el recorrido financiero integral y backup/restauración sobre infraestructura sintética aislada; conserva `IMPLEMENTADO / SIN VALIDAR` por los límites detallados en `docs/validation/c03-collection-day.md`. O-01 mantiene `EN PLAN` por la documentación de `docs/platform/`; no hay evidencia de operación real. No se encontró evidencia suficiente para avanzar los demás estados.
+**Contraste de estados del 2026-10-18:** C-01, C-02 y C-03 están integrados en `main`, pero conservan `IMPLEMENTADO / SIN VALIDAR`: [Móvil #14](https://github.com/mauroponce/app_cobranzas/actions/runs/39106253493) pasó y [Backend #18](https://github.com/mauroponce/app_cobranzas/actions/runs/39106253501) falló en `php artisan test`; siguen pendientes la revisión independiente y los límites de validación de C-03. C-04 incorpora infraestructura, recuperación, distribución, soporte y procedimientos en una rama identificable, por lo que avanza a `IMPLEMENTADO / SIN VALIDAR`; no existe evidencia de despliegue, APK distribuida ni operación real. O-01 mantiene `EN PLAN`. No se encontró evidencia suficiente para avanzar los demás estados.
 
-**Próxima tarea de ingeniería recomendada:** diagnosticar el CI backend del commit vigente y ejecutar `$dev-review` independiente de C-01/C-02/C-03. Después, completar la inspección móvil interactiva, la carrera de aprobación administrativa y la migración sobre copia anonimizada representativa. No iniciar C-04 mientras C-03 no esté validado.
+**Próxima tarea de ingeniería recomendada:** ejecutar `$dev-review` independiente de C-04 y diagnosticar el CI backend del commit vigente. Después, completar el restore integral en infraestructura aislada, la inspección móvil física, la carrera de aprobación administrativa y la migración sobre copia anonimizada representativa. No autorizar el piloto real mientras la puerta GO conserve pendientes.
 
 ## 4. Evidencia existente y criterios de aceptación por hito
 
@@ -102,7 +102,46 @@ Los formularios Livewire para **atribuir diferencias** y **reasignar visitas** e
 - [ ] Repetir migración y medición sobre una copia anonimizada representativa; los datos usados en esta ejecución fueron sintéticos.
 - [ ] Completar interacción visual móvil y prueba simultánea de dos administradores; obtener CI backend verde y revisión independiente.
 
-**Evidencia C-03 del 2026-10-17:** `CollectionsEndToEndTest` aprobó el escenario exacto con 48 aserciones: venta A `$ 300.000,00` en 3 × `$ 100.000,00`, venta B `$ 60.000,00`, declaración `$ 30.000,00` efectivo + `$ 50.000,00` transferencia, recepción `$ 25.000,00`, diferencia `$ 5.000,00` y saldos finales A `$ 225.000,00`, B `$ 60.000,00`, total `$ 285.000,00`. La suite final aprobó 118 pruebas / 668 aserciones, Pint 192 archivos, assets, TypeScript, ESLint, Prettier y Jest (3 suites / 16 pruebas). Origen y restauración conservaron 22 migraciones, 69 tablas y el tenant sintético. El AVD Android inició y aceptó el APK, pero Metro no abrió el puerto por espera de I/O; no existe evidencia visual suficiente. C-03 no está `VALIDADO` y C-04 continúa bloqueado.
+**Evidencia C-03 del 2026-10-17:** `CollectionsEndToEndTest` aprobó el escenario exacto con 48 aserciones: venta A `$ 300.000,00` en 3 × `$ 100.000,00`, venta B `$ 60.000,00`, declaración `$ 30.000,00` efectivo + `$ 50.000,00` transferencia, recepción `$ 25.000,00`, diferencia `$ 5.000,00` y saldos finales A `$ 225.000,00`, B `$ 60.000,00`, total `$ 285.000,00`. La suite final aprobó 118 pruebas / 668 aserciones, Pint 192 archivos, assets, TypeScript, ESLint, Prettier y Jest (3 suites / 16 pruebas). Origen y restauración conservaron 22 migraciones, 69 tablas y el tenant sintético. El AVD Android inició y aceptó el APK, pero Metro no abrió el puerto por espera de I/O; no existe evidencia visual suficiente. C-03 no está `VALIDADO` y la operación real de C-04 continúa bloqueada.
+
+### C-04 — Preparación del piloto controlado
+
+La preparación técnica está implementada en `feat/c-04-pilot-readiness`; el
+informe y la puerta vigente están en
+[`docs/pilots/c04-readiness.md`](docs/pilots/c04-readiness.md). Esto no equivale
+a autorización, ejecución ni aceptación del piloto.
+
+- [x] Configuración reproducible para HTTPS, Laravel, PostgreSQL persistente,
+  Redis, cola, scheduler, almacenamiento privado, logs y healthchecks, sin
+  secretos versionados ni despliegue real.
+- [x] Scripts de backup PostgreSQL + documentos privados, checksums y restore
+  que rehúsa sobrescribir y solo acepta una base nueva terminada en `_test`.
+- [x] Perfil EAS de APK interna y procedimiento de instalación/actualización
+  controlada; no se generó ni distribuyó una build.
+- [x] Soporte tenant-aware para dispositivos, sincronizaciones, incidencias y
+  auditoría; la revocación exacta del dispositivo invalida su token y se audita.
+- [x] Runbook, capacitación, checklist, soporte, informe diario, acta de
+  aceptación y GO / NO-GO sin datos identificatorios reales.
+- [x] Verificación local: `make test` aprobó 123 pruebas / 696 aserciones; Pint
+  aprobó 198 archivos; `make assets`, TypeScript, ESLint, Prettier y Jest (3
+  suites / 16 pruebas) aprobaron; sintaxis de scripts, configuración Compose y
+  whitespace aprobaron.
+- [ ] Completar un ensayo integrado de backup y restore PostgreSQL + documentos:
+  el intento aislado de C-04 no terminó de construir la imagen PHP y no produjo
+  evidencia de restauración. Se conserva únicamente la evidencia DB sintética
+  de C-03.
+- [ ] Obtener CI verde de la rama y revisión independiente; corregir cualquier
+  defecto bloqueante.
+- [ ] Aprobar identificador Android/cuenta Expo y verificar APK en dispositivo
+  físico autorizado.
+- [ ] Definir participantes, dispositivos, jornadas, fuente oficial, fecha de
+  corte, RPO/RTO, responsables y alcance; conciliar saldos sobre una copia
+  anonimizada representativa.
+- [ ] Obtener autorización humana explícita antes de desplegar, migrar datos,
+  distribuir a empleados o registrar dinero real.
+
+**Veredicto del 2026-10-18: NO-GO.** C-04 está `IMPLEMENTADO / SIN VALIDAR`, no
+`OPERATIVO`.
 
 ### I-01 / I-02 — Importación desde Excel sin inventar deuda
 

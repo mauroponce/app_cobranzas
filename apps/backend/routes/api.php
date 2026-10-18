@@ -6,6 +6,7 @@ use App\Http\Controllers\CollectionPortfolioApiController;
 use App\Http\Controllers\CollectionStructureApiController;
 use App\Http\Controllers\CollectionWorkflowApiController;
 use App\Http\Controllers\CommercialApiController;
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MobileAuthApiController;
 use App\Http\Controllers\MobileDeviceApiController;
 use App\Http\Controllers\PaymentApiController;
@@ -13,7 +14,8 @@ use App\Http\Controllers\SalesApiController;
 use App\Http\Controllers\SyncApiController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/health', fn () => response()->json(['data' => ['status' => 'ok']]));
+Route::get('/health', [HealthController::class, 'live']);
+Route::get('/readiness', [HealthController::class, 'ready']);
 Route::post('/auth/login', [MobileAuthApiController::class, 'login'])->middleware('throttle:5,1');
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/auth/logout', [MobileAuthApiController::class, 'logout']);

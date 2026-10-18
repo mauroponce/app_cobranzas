@@ -24,6 +24,7 @@
             @if(request()->attributes->get('activeTenant'))<p class="admin-nav-caption">OPERACIONES</p>
             @can('payments.view')<x-ui.nav-link icon="wallet" label="Cobranzas" :href="route('collections.index')" :active="request()->routeIs('collections.*')" />@endcan
             @can('customers.view')<x-ui.nav-link icon="users" label="Clientes" :href="route('customers.index')" :active="request()->routeIs('customers.*')" />@endcan
+            @can('collections.reassign')<x-ui.nav-link icon="activity" label="Soporte" :href="route('support.index')" :active="request()->routeIs('support.*')" />@endcan
             @endif
         </nav>
         <div class="admin-sidebar-footer">

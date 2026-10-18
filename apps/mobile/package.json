@@ -44,7 +44,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write 'App.tsx' 'src/**/*.{ts,tsx}'",
-    "format:check": "prettier --check 'App.tsx' 'src/**/*.{ts,tsx}'"
+    "format:check": "prettier --check 'App.tsx' 'src/**/*.{ts,tsx}'",
+    "build:pilot:android": "npx --yes eas-cli@25.2.0 build --platform android --profile pilot"
   },
   "jest": {
     "preset": "jest-expo",

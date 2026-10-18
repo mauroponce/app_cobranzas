@@ -1,0 +1,107 @@
+name: app-cobranzas-pilot
+
+x-backend: &backend
+  build:
+    context: .
+    dockerfile: infra/docker/php/Dockerfile
+  image: app-cobranzas-php:pilot
+  env_file:
+    - ${PILOT_ENV_FILE:-.env.pilot}
+  environment:
+    APP_ENV: production
+    APP_DEBUG: "false"
+    APP_TIMEZONE: America/Argentina/Buenos_Aires
+    TZ: America/Argentina/Buenos_Aires
+    DB_HOST: postgres
+    REDIS_HOST: redis
+    LOG_CHANNEL: stderr
+  restart: unless-stopped
+  volumes:
+    - ${PILOT_BACKUP_ROOT:-./var/pilot-backups}:/backups
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  app:
+    <<: *backend
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit(@fsockopen(\"127.0.0.1\", 9000) ? 0 : 1);'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  nginx:
+    build:
+      context: .
+      dockerfile: infra/docker/nginx/Dockerfile.pilot
+    image: app-cobranzas-nginx:pilot
+    ports:
+      - "${PILOT_HTTPS_PORT:-443}:443"
+    volumes:
+      - ${PILOT_TLS_CERT_PATH:-./infra/pilot/certs/fullchain.pem}:/etc/nginx/tls/fullchain.pem:ro
+      - ${PILOT_TLS_KEY_PATH:-./infra/pilot/certs/privkey.pem}:/etc/nginx/tls/privkey.pem:ro
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --insecure https://127.0.0.1/api/v1/readiness >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  postgres:
+    image: postgres:17
+    env_file:
+      - ${PILOT_ENV_FILE:-.env.pilot}
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:?DB_DATABASE must be set}
+      POSTGRES_USER: ${DB_USERNAME:?DB_USERNAME must be set}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    env_file:
+      - ${PILOT_ENV_FILE:-.env.pilot}
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$${REDIS_PASSWORD}\""]
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  queue:
+    <<: *backend
+    command: php artisan queue:work redis --sleep=3 --tries=3 --timeout=90 --max-time=3600
+    healthcheck:
+      test: ["CMD-SHELL", "tr '\\0' ' ' </proc/1/cmdline | grep -q 'queue:work'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  scheduler:
+    <<: *backend
+    command: php artisan schedule:work
+    healthcheck:
+      test: ["CMD-SHELL", "tr '\\0' ' ' </proc/1/cmdline | grep -q 'schedule:work'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -13,6 +13,7 @@
         @case('chart')<path d="M3 3v18h18M7 17l4-5 3 2 5-8"/>@break
         @case('settings')<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="16" cy="17" r="2"/>@break
         @case('menu')<path d="M4 6h16M4 12h16M4 18h16"/>@break
+        @case('activity')<path d="M3 12h4l2-7 4 14 2-7h6"/>@break
         @case('theme')<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18V3Z"/>@break
         @case('chevrons')<path d="m7 9 5-5 5 5m-10 6 5 5 5-5"/>@break
         @case('logout')<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>@break

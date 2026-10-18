@@ -89,7 +89,14 @@ usuario global activo
 - API guarda el tenant seleccionado en el token Sanctum y lo revalida en `tenant.api`.
 - `/api/v1/me/capabilities` publica módulos, permisos efectivos con scope y versiones para el móvil.
 - El móvil decide navegación por capabilities, no por nombre de rol. Conserva el rol solo para mostrarlo.
-- El servidor recalcula autorización en cada request. El móvil conserva capabilities y datos SQLite hasta refrescar o volver a iniciar sesión; hoy no reacciona automáticamente a `authorization_version`.
+- El servidor recalcula autorización en cada request. El móvil conserva capabilities hasta refrescar o volver a iniciar sesión; hoy no reacciona automáticamente a `authorization_version`.
+- El pull de sincronización compara `portfolio_version` con `tenant.authorization_version` y purga clientes/obligaciones autorizados cuando detecta un cambio. Esto no cubre cambios de rol o estado, que hoy no incrementan esa versión, ni una revocación que hace fallar el request antes de la purga.
+
+### Contratos backend y móvil
+
+`packages/api-contract/capabilities.ts` describe `role`, features, permisos con scope y versiones. El backend entrega esa forma desde `ApiContextController::capabilities`, pero el móvil mantiene una copia local en `apps/mobile/src/contracts/capabilities.ts` y tipos adicionales embebidos en `sync/worker.ts`; no existe una dependencia de workspace que obligue a consumir el paquete. Las formas coinciden en el commit evaluado, pero la paridad depende de revisión manual.
+
+El contrato documentado en `packages/api-contract/README.md` todavía llama “efectivos” a los permisos de `/permissions`, aunque ese endpoint devuelve el preset de `RoleMatrix`. El contrato efectivo para navegación es `/me/capabilities`.
 
 ## Acoplamientos con roles rígidos
 
@@ -168,9 +175,9 @@ Estos agrupamientos son diseño para M-02, no funcionalidades disponibles. Los n
 ### AUDIT-005 — Versiones y caché móvil no cubren todos los cambios de acceso
 
 - **Severidad:** HIGH. **Confianza:** CONFIRMED. **Esfuerzo:** MEDIUM.
-- **Evidencia:** feature y override incrementan versiones; cambio de rol/estado no lo hace. `AuthContext` refresca capabilities al iniciar/restaurar sesión o por acción explícita; el ciclo de sync no compara la versión para refrescarlas. Un 403 bloquea outbox, pero no elimina inmediatamente clientes/obligaciones locales ya autorizados.
+- **Evidencia:** feature, override y asignación incrementan versiones; cambio de rol/estado no lo hace. `AuthContext` refresca capabilities al iniciar/restaurar sesión o por acción explícita y el sync solo usa la versión del tenant para invalidar cartera. Un 403 bloquea el ciclo antes de eliminar datos locales ya autorizados.
 - **Impacto:** el servidor niega requests revocados, pero la navegación y datos locales pueden permanecer visibles en un dispositivo hasta refresco o cierre de sesión.
-- **Dirección:** centralizar el bump para rol, estado, override, feature y asignaciones; devolver la versión en sync; ante cambio o 403 refrescar capabilities y purgar caché autorizada del scope, preservando outbox para revisión.
+- **Dirección:** centralizar el bump para rol, estado, override, feature y asignaciones; comparar versiones de tenant y membresía; ante cambio o 403 refrescar capabilities y purgar caché autorizada del scope, preservando outbox para revisión.
 
 ### AUDIT-006 — Catálogo ejecutable y catálogo persistido pueden derivar
 
@@ -192,6 +199,27 @@ Estos agrupamientos son diseño para M-02, no funcionalidades disponibles. Los n
 - **Evidencia:** `QuotationService` comprueba `owner`/`admin`, mientras el controlador ya usa `products.manage_prices` para definir listas visibles.
 - **Impacto:** delegaciones válidas pueden mostrar una lista en UI y ser rechazadas por servicio; el comportamiento depende de dos reglas.
 - **Dirección:** elegir una capability explícita y hacerla consistente en consulta y servicio.
+
+### AUDIT-009 — El móvil elige siempre la primera empresa
+
+- **Severidad:** MEDIUM. **Confianza:** CONFIRMED. **Esfuerzo:** MEDIUM.
+- **Evidencia:** `AuthContext::capabilities` consulta `/tenants` y ejecuta `/tenant/select` con `tenants.data[0]`; no hay selector de empresa. `refresh` repite la misma elección.
+- **Impacto:** una identidad con varias membresías no puede operar la segunda empresa desde el móvil y un refresh puede devolverla silenciosamente a la primera, aunque el backend soporte selección explícita por token.
+- **Dirección:** conservar la empresa seleccionada por token/usuario, ofrecer selector cuando haya más de una y limpiar/cambiar el scope SQLite de forma explícita.
+
+### AUDIT-010 — Restablecer un override no es atómico
+
+- **Severidad:** MEDIUM. **Confianza:** HIGH CONFIDENCE. **Esfuerzo:** LOW.
+- **Evidencia:** `AuthorizationManagementService::resetOverride` elimina el override, incrementa versiones y registra auditoría sin una transacción; `setOverride` y `setFeature` sí son transaccionales.
+- **Impacto:** un fallo entre esos pasos puede aplicar un cambio de acceso sin invalidación o sin evidencia de auditoría.
+- **Dirección:** ejecutar eliminación, bump y auditoría en una única transacción con bloqueo/relectura tenant-aware del override.
+
+### AUDIT-011 — El contrato TypeScript no es una fuente consumida
+
+- **Severidad:** LOW. **Confianza:** CONFIRMED. **Esfuerzo:** LOW.
+- **Evidencia:** `packages/api-contract/capabilities.ts` y `apps/mobile/src/contracts/capabilities.ts` duplican tipos; `sync/worker.ts` vuelve a declarar respuestas y `apps/mobile/package.json` no depende del paquete.
+- **Impacto:** backend, contrato compartido y cliente pueden divergir sin que typecheck lo detecte.
+- **Dirección:** convertir `api-contract` en paquete de workspace consumido o generar/validar contratos en CI; no mantener copias manuales como si fueran una garantía.
 
 ## Alternativas para responsabilidades combinables
 
@@ -244,6 +272,7 @@ La suite existente ya cubre selección de tenant, membresías múltiples, revoca
 - módulo no disponible frente a disponible pero deshabilitado;
 - deny individual y grant individual con scope autorizado;
 - cambio de permisos y versiones con el mismo token;
+- cambio de rol recalculado por servidor que actualmente no incrementa versiones;
 - revocación de membresía y rechazo de requests de un token ya emitido;
 - acceso cruzado a recursos;
 - operador de plataforma sin acceso financiero implícito;
@@ -256,8 +285,8 @@ Los escenarios de repartidor+cobrador, conjuntos reutilizables y segregación co
 
 Ejecución local del 2026-10-18 sobre PostgreSQL 17 y una base aislada terminada en `_test`:
 
-- `make test TEST_ARGS='--filter=MultitenantAuthorizationCharacterizationTest --colors=never'`: 10 pruebas, 46 aserciones, sin fallos ni warnings.
-- `make test`: 128 pruebas, 714 aserciones, sin fallos.
+- `make test TEST_ARGS='--filter=MultitenantAuthorizationCharacterizationTest --colors=never'`: 11 pruebas, 51 aserciones, sin fallos ni warnings.
+- `make test`: 129 pruebas, 719 aserciones, sin fallos.
 - `./vendor/bin/pint --test`: 193 archivos, sin cambios de formato requeridos.
 
 No se observaron fallos preexistentes en esta ejecución. No se ejecutaron migraciones destructivas, seeders generales ni pruebas contra bases ajenas al worktree.
@@ -283,7 +312,8 @@ No se observaron fallos preexistentes en esta ejecución. No se ejecutaron migra
 2. **P0:** diseñar el reemplazo seguro del discriminador de rol en `PaymentService` (`AUDIT-003`) antes de conceder cobro a otros perfiles.
 3. **P1:** implementar conjuntos operativos mínimos, elegibilidad unificada y migración compatible (`AUDIT-002`).
 4. **P1:** completar versionado e invalidación móvil (`AUDIT-005`).
-5. **P2:** reconciliar catálogo y eliminar el fallback permisivo (`AUDIT-006`).
-6. **P2:** deprecar `/permissions`, normalizar listas no públicas y decidir si `documents` merece feature propia (`AUDIT-004`, `AUDIT-008`).
+5. **P1:** permitir selección estable de empresa en móvil (`AUDIT-009`).
+6. **P2:** hacer atómico el reset de overrides, reconciliar catálogo y eliminar el fallback permisivo (`AUDIT-006`, `AUDIT-010`).
+7. **P2:** deprecar `/permissions`, consumir un contrato compartido, normalizar listas no públicas y decidir si `documents` merece feature propia (`AUDIT-004`, `AUDIT-008`, `AUDIT-011`).
 
 M-02 requiere `dev-plan` específico por su impacto en autorización, datos y compatibilidad de despliegue. No debe comenzar cambiando roles o servicios financieros sin aprobar primero esos cortes.

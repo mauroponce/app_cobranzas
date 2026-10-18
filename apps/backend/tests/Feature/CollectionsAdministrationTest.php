@@ -6,13 +6,17 @@ use App\Domain\Collections\CashSettlementService;
 use App\Domain\Collections\CollectionRouteService;
 use App\Domain\Collections\CollectionWorkflowService;
 use App\Domain\Tenancy\AuthorizationManagementService;
+use App\Domain\Tenancy\AuthorizationService;
 use App\Livewire\CollectionsDashboard;
 use App\Models\CashSettlement;
 use App\Models\CollectionDeclaration;
 use App\Models\CollectionRoute;
+use App\Models\CollectionTeam;
+use App\Models\CollectionTeamMember;
 use App\Models\Customer;
 use App\Models\CustomerAccountEntry;
 use App\Models\Permission;
+use App\Models\RolePermission;
 use App\Models\Sale;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
@@ -148,6 +152,111 @@ class CollectionsAdministrationTest extends TestCase
             ->assertSee('$ 10,00');
 
         $component->call('reviewSettlement', $foreignSettlement->id)->assertNotFound();
+    }
+
+    public function test_collector_only_lists_and_opens_own_settlements(): void
+    {
+        $owner = $this->member('owner');
+        $collector = $this->member('collector', $owner->tenant, 'Cobrador Propio');
+        $otherCollector = $this->member('collector', $owner->tenant, 'Cobrador Ajeno');
+        [$ownSettlement] = $this->submittedSettlement($owner, $collector, '10.00', 'Propia');
+        [$otherSettlement] = $this->submittedSettlement($owner, $otherCollector, '20.00', 'Ajena');
+
+        $token = $collector->user->createToken('own-settlements')->plainTextToken;
+        $this->withToken($token)->postJson('/api/v1/tenant/select', ['tenant_id' => $owner->tenant_id])->assertOk();
+        $this->withToken($token)->getJson('/api/v1/settlements')->assertOk()
+            ->assertJsonCount(1, 'data.data')
+            ->assertJsonPath('data.data.0.id', $ownSettlement->id);
+
+        $this->dashboard($collector)
+            ->call('showTab', 'settlements')
+            ->assertViewHas('settlements', fn ($settlements) => $settlements->pluck('id')->all() === [$ownSettlement->id])
+            ->call('reviewSettlement', $ownSettlement->id)
+            ->assertSet('selectedSettlementId', $ownSettlement->id)
+            ->call('reviewSettlement', $otherSettlement->id)
+            ->assertNotFound();
+    }
+
+    public function test_team_settlement_scope_excludes_other_teams_and_tenants(): void
+    {
+        $owner = $this->member('owner');
+        $supervisor = $this->member('supervisor', $owner->tenant, 'Supervisora Norte');
+        $teamCollector = $this->member('collector', $owner->tenant, 'Cobrador Norte');
+        $outsideCollector = $this->member('collector', $owner->tenant, 'Cobrador Sur');
+        [$teamSettlement] = $this->submittedSettlement($owner, $teamCollector, '10.00', 'Norte');
+        [$outsideSettlement] = $this->submittedSettlement($owner, $outsideCollector, '20.00', 'Sur');
+        $foreignOwner = $this->member('owner');
+        $foreignCollector = $this->member('collector', $foreignOwner->tenant, 'Cobrador Externo');
+        [$foreignSettlement] = $this->submittedSettlement($foreignOwner, $foreignCollector, '30.00', 'Externa');
+        $team = CollectionTeam::create(['tenant_id' => $owner->tenant_id, 'name' => 'Norte', 'status' => 'active']);
+        CollectionTeamMember::create(['tenant_id' => $owner->tenant_id, 'team_id' => $team->id, 'membership_id' => $supervisor->id, 'team_role' => 'supervisor', 'joined_at' => now()]);
+        CollectionTeamMember::create(['tenant_id' => $owner->tenant_id, 'team_id' => $team->id, 'membership_id' => $teamCollector->id, 'team_role' => 'collector', 'joined_at' => now()]);
+        app(AuthorizationManagementService::class)->setOverride(
+            $owner->tenant,
+            $owner->user,
+            $supervisor,
+            Permission::where('key', 'settlements.view')->firstOrFail(),
+            'allow',
+            'team',
+        );
+
+        $token = $supervisor->user->createToken('team-settlements')->plainTextToken;
+        $this->withToken($token)->postJson('/api/v1/tenant/select', ['tenant_id' => $owner->tenant_id])->assertOk();
+        $this->withToken($token)->getJson('/api/v1/settlements')->assertOk()
+            ->assertJsonCount(1, 'data.data')
+            ->assertJsonPath('data.data.0.id', $teamSettlement->id)
+            ->assertJsonMissing(['id' => $outsideSettlement->id])
+            ->assertJsonMissing(['id' => $foreignSettlement->id]);
+
+        $this->dashboard($supervisor)
+            ->call('showTab', 'settlements')
+            ->assertViewHas('settlements', fn ($settlements) => $settlements->pluck('id')->all() === [$teamSettlement->id])
+            ->call('reviewSettlement', $teamSettlement->id)
+            ->assertSet('selectedSettlementId', $teamSettlement->id)
+            ->call('reviewSettlement', $outsideSettlement->id)
+            ->assertNotFound();
+    }
+
+    public function test_collector_settlement_permissions_default_to_own_scope(): void
+    {
+        $owner = $this->member('owner');
+        $collector = $this->member('collector', $owner->tenant);
+        $supervisor = $this->member('supervisor', $owner->tenant);
+        $viewer = $this->member('viewer', $owner->tenant);
+
+        foreach (['settlements.view', 'settlements.create', 'settlements.submit'] as $capability) {
+            $this->assertSame(
+                ['allowed' => true, 'scope' => 'own'],
+                app(AuthorizationService::class)->decision($collector->fresh('tenant'), $capability),
+            );
+        }
+
+        $authorization = app(AuthorizationService::class);
+        $this->assertSame(['allowed' => true, 'scope' => 'all'], $authorization->decision($owner->fresh('tenant'), 'settlements.view'));
+        $this->assertSame(['allowed' => true, 'scope' => 'all'], $authorization->decision($supervisor->fresh('tenant'), 'settlements.view'));
+        $this->assertSame(['allowed' => true, 'scope' => 'all'], $authorization->decision($viewer->fresh('tenant'), 'settlements.view'));
+    }
+
+    public function test_scope_migration_updates_existing_collector_permissions_and_authorization_version(): void
+    {
+        $owner = $this->member('owner');
+        $this->member('collector', $owner->tenant);
+        $permissionIds = Permission::whereIn('key', ['settlements.view', 'settlements.create', 'settlements.submit'])->pluck('id');
+        RolePermission::where('role', 'collector')->whereIn('permission_id', $permissionIds)->update(['scope' => 'all']);
+        $authorizationVersion = $owner->tenant->fresh()->authorization_version;
+
+        $migration = require database_path('migrations/2026_10_18_200000_harden_multitenant_authorization_scopes.php');
+        $migration->up();
+
+        $this->assertSame(
+            ['own'],
+            RolePermission::where('role', 'collector')->whereIn('permission_id', $permissionIds)->distinct()->pluck('scope')->all(),
+        );
+        $this->assertSame($authorizationVersion + 1, $owner->tenant->fresh()->authorization_version);
+        $this->assertSame(
+            ['all'],
+            RolePermission::where('role', 'supervisor')->whereIn('permission_id', $permissionIds)->distinct()->pluck('scope')->all(),
+        );
     }
 
     public function test_transfer_action_confirms_only_the_transfer_component_of_a_combined_declaration(): void

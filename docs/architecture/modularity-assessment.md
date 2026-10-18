@@ -58,7 +58,7 @@ No existe `delivery` ni reparto en el catálogo actual. Agregarlo antes de un ca
 | `admin` | Todas las capabilities; no puede asignar ni administrar propietarios. |
 | `supervisor` | Consulta de empresa, usuarios, clientes, catálogo, ventas, cobranzas, rutas, rendiciones e informes; aprobación y operación administrativa. En cartera/pagos usa scope `team`, pero otros permisos con varios scopes reciben actualmente `all`. |
 | `seller` | Clientes, catálogo público, presupuestos propios, creación de ventas y documentos propios. No incluye aprobación ni cobranza. |
-| `collector` | Clientes, cartera, cobros, rutas y rendiciones. `customers.view`, `payments.view`, `payments.create` y `collections.portfolio.view` usan `assigned`; `settlements.view/create/submit` reciben actualmente `all` por el default del seeder. |
+| `collector` | Clientes, cartera, cobros, rutas y rendiciones. `customers.view`, `payments.view`, `payments.create` y `collections.portfolio.view` usan `assigned`; desde la corrección de AUDIT-007, `settlements.view/create/submit` usan `own`. |
 | `logistics` | `tenant.view`, `customers.view`, `routes.view`. No existe dominio ni capacidad de entrega. |
 | `viewer` | Consulta general de empresa, clientes, catálogo, presupuestos, ventas, cobranzas, rutas, rendiciones e informes. |
 
@@ -70,7 +70,7 @@ Los permisos exactos permanecen en `RoleMatrix::CAPABILITIES` y `RoleMatrix::PER
 - `team`, `all`: capacidades de equipos.
 - `all`: las demás.
 
-`CollectionPortfolioService` aplica correctamente `assigned` y `team` para cartera y cobro. En cambio, `CommercialApiController` solo trata `own` y deja pasar `assigned`/`team` como consulta completa; `CustomerController` y `CustomerPolicy` tampoco aplican esos scopes. `CashSettlementApiController` solo restringe `own`, por lo que `assigned` o `team` no limitan el listado. La declaración de un scope no constituye por sí sola autorización de recurso.
+`CollectionPortfolioService` aplica `own`, `assigned`, `team` y `all` a clientes y es reutilizado por web, API, Policy y sincronización. `CashSettlementScopeService` aplica los mismos alcances con semántica de hoja y reutiliza `CollectionAssignmentScope` para resolver membresías asignadas o de equipo. La declaración de un scope no constituye por sí sola autorización de recurso: cada listado y detalle debe usar el scoper correspondiente.
 
 ## Mapa de dependencias
 
@@ -132,7 +132,7 @@ Estos agrupamientos son diseño para M-02, no funcionalidades disponibles. Los n
 
 ## Limitaciones actuales
 
-- La capability y su scope no garantizan el mismo conjunto de recursos en todos los endpoints.
+- Las superficies de clientes y rendiciones ya comparten scopers; otros dominios con scopes múltiples deben mantener la misma disciplina al agregar endpoints.
 - Las hojas y varios selectores siguen exigiendo el título `collector`.
 - El flujo de pago administrativo distingue roles en vez de responsabilidad y origen.
 - El catálogo existe tanto en PHP como en PostgreSQL sin reconciliación cerrada.
@@ -144,10 +144,11 @@ Estos agrupamientos son diseño para M-02, no funcionalidades disponibles. Los n
 
 ### AUDIT-001 — Scopes declarados no se aplican de forma uniforme
 
+- **Estado:** CORREGIDO / PENDIENTE DE VALIDACIÓN INDEPENDIENTE.
 - **Severidad:** HIGH. **Confianza:** CONFIRMED. **Esfuerzo:** MEDIUM.
-- **Evidencia:** `CommercialApiController` solo filtra `customers.view = own`; `CustomerController` y `CustomerPolicy` no aplican `assigned`/`team`; `CashSettlementApiController` solo limita `own`.
-- **Impacto:** una membresía con scope acotado puede consultar recursos del mismo tenant fuera de su cartera o equipo por un endpoint alternativo. El aislamiento entre empresas permanece, pero falla el mínimo privilegio interno.
-- **Dirección:** definir scopers reutilizables por recurso/capability y hacer que web, API, Policies y sync usen la misma decisión. Agregar primero pruebas negativas por endpoint.
+- **Evidencia original:** `CommercialApiController` solo filtraba `customers.view = own`; `CustomerController` y `CustomerPolicy` no aplicaban `assigned`/`team`; `CashSettlementApiController` solo limitaba `own`.
+- **Corrección:** `CollectionPortfolioService`, `CollectionAssignmentScope` y `CashSettlementScopeService` centralizan el filtrado; web, API, Policy, sync y Livewire usan las mismas decisiones para listados y detalles.
+- **Evidencia de regresión:** `CollectionPortfolioTest` cubre `own`, `assigned`, `team`, acceso web/API/sync y cruce entre dos empresas. `CollectionsAdministrationTest` cubre rendiciones propias, de equipo, ajenas dentro del tenant y de otra empresa en API y Livewire.
 - **Producción:** corregir de forma compatible con Trotamundo; puede reducir resultados antes visibles, por lo que requiere comunicar y observar rechazos legítimos.
 
 ### AUDIT-002 — La elegibilidad de hojas continúa atada a `collector`
@@ -188,10 +189,11 @@ Estos agrupamientos son diseño para M-02, no funcionalidades disponibles. Los n
 
 ### AUDIT-007 — Scopes por defecto de rendiciones exceden la intención del rol
 
+- **Estado:** CORREGIDO / PENDIENTE DE VALIDACIÓN INDEPENDIENTE.
 - **Severidad:** MEDIUM. **Confianza:** CONFIRMED. **Esfuerzo:** LOW.
-- **Evidencia:** `settlements.view/create/submit` admiten scopes acotados, pero `defaultScope` no los incluye y asigna `all` al rol `collector`; el listado API solo filtra `own`.
-- **Impacto:** un cobrador puede listar rendiciones de otros integrantes del mismo tenant, aunque los servicios protejan mutaciones propias.
-- **Dirección:** corregir el preset a `own` y cubrir listado/detalle con pruebas de recursos propios y ajenos antes de migrar datos de autorización.
+- **Evidencia original:** `settlements.view/create/submit` admitían scopes acotados, pero `defaultScope` no los incluía y asignaba `all` al rol `collector`; el listado API solo filtraba `own`.
+- **Corrección:** el seeder y una migración versionada asignan `own` al cobrador e incrementan la versión de autorización de tenants existentes. Propietario, supervisor y consulta conservan `all`; un override `team` se filtra por equipo activo supervisado.
+- **Evidencia de regresión:** `CollectionsAdministrationTest` verifica presets por rol, listado propio del cobrador, equipo autorizado, recursos ajenos del mismo tenant y aislamiento entre empresas.
 
 ### AUDIT-008 — Autorización de listas no públicas duplica roles rígidos
 
@@ -291,6 +293,16 @@ Ejecución local del 2026-10-18 sobre PostgreSQL 17 y una base aislada terminada
 
 No se observaron fallos preexistentes en esta ejecución. No se ejecutaron migraciones destructivas, seeders generales ni pruebas contra bases ajenas al worktree.
 
+### Evidencia de corrección de AUDIT-001 y AUDIT-007
+
+Ejecución local del 2026-10-18 sobre PostgreSQL y `app_cobranzas_test`, en la rama `fix/multitenant-authorization-scopes`:
+
+- `make test TEST_ARGS='--colors=never'`: 140 pruebas, 806 aserciones, sin fallos.
+- `./vendor/bin/pint --test`: 202 archivos, sin cambios de formato requeridos.
+- La suite incluye pruebas negativas de clientes y rendiciones ajenos dentro del mismo tenant, scopes `own`, `assigned`, `team` y `all`, web, API, sincronización, detalle Livewire, dos empresas y migración del preset existente con incremento de versión.
+
+Esta evidencia permite registrar ambos hallazgos como corregidos en la rama. La validación definitiva y la aptitud para integrar continúan pendientes de un `$dev-review` independiente.
+
 ## Criterios de aceptación futuros para M-02
 
 1. Una membresía puede reunir venta y cobranza sin cambiar de tenant ni duplicar usuario.
@@ -308,7 +320,7 @@ No se observaron fallos preexistentes en esta ejecución. No se ejecutaron migra
 
 ## Cambios futuros priorizados
 
-1. **P0:** cerrar `AUDIT-001` y `AUDIT-007` con scopers y pruebas negativas de mínimo privilegio.
+1. **P0 completado / pendiente de revisión independiente:** `AUDIT-001` y `AUDIT-007` cuentan con scopers y pruebas negativas de mínimo privilegio.
 2. **P0:** diseñar el reemplazo seguro del discriminador de rol en `PaymentService` (`AUDIT-003`) antes de conceder cobro a otros perfiles.
 3. **P1:** implementar conjuntos operativos mínimos, elegibilidad unificada y migración compatible (`AUDIT-002`).
 4. **P1:** completar versionado e invalidación móvil (`AUDIT-005`).

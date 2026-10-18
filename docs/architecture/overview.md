@@ -62,7 +62,7 @@ Para agregar un módulo, declarar capacidades estables en `RoleMatrix`, asignarl
 
 ## Etapa 6: carteras de cobranza
 
-Las carteras, equipos y zonas se documentan en [carteras de cobranza](collection-portfolios.md). La asignación de cobrador es independiente de la relación comercial con el vendedor. Las consultas de cobros, el registro de declaraciones y `/sync/pull` aplican los scopes `assigned`, `team` y `all` sobre asignaciones activas de la empresa.
+Las carteras, equipos y zonas se documentan en [carteras de cobranza](collection-portfolios.md). La asignación de cobrador es independiente de la relación comercial con el vendedor. Los listados y detalles web/API de clientes, las consultas de cobros, el registro de declaraciones y `/sync/pull` aplican los scopes `own`, `assigned`, `team` y `all` mediante scopers compartidos. Las rendiciones usan la membresía asignada a la hoja: `own` y `assigned` limitan a la membresía actual, `team` a equipos activos supervisados y `all` a la empresa.
 
 ## Verificación
 

@@ -50,14 +50,18 @@ class AuthorizationCatalogSeeder extends Seeder
 
     private function defaultScope(string $role, string $capability): string
     {
-        if (! in_array($capability, ['customers.view', 'payments.view', 'payments.create', 'collections.portfolio.view'], true)) {
-            return 'all';
+        if ($role === 'collector' && in_array($capability, ['settlements.view', 'settlements.create', 'settlements.submit'], true)) {
+            return 'own';
         }
 
-        return match ($role) {
-            'collector' => 'assigned',
-            'supervisor' => 'team',
-            default => 'all',
-        };
+        if (in_array($capability, ['customers.view', 'payments.view', 'payments.create', 'collections.portfolio.view'], true)) {
+            return match ($role) {
+                'collector' => 'assigned',
+                'supervisor' => 'team',
+                default => 'all',
+            };
+        }
+
+        return 'all';
     }
 }

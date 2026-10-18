@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Domain\Collections\CashSettlementScopeService;
 use App\Domain\Collections\CashSettlementService;
 use App\Domain\Collections\CollectionRouteService;
 use App\Domain\Collections\PaymentService;
@@ -102,10 +103,13 @@ class CollectionsDashboard extends Component
         session()->flash('status', 'La transferencia fue conciliada y aplicada a la cuenta corriente.');
     }
 
-    public function reviewSettlement(string $settlementId): void
+    public function reviewSettlement(string $settlementId, CashSettlementScopeService $scope): void
     {
         Gate::authorize('settlements.view');
-        $settlement = CashSettlement::forTenant(request()->attributes->get('activeTenant'))->with('items')->findOrFail($settlementId);
+        $settlement = $scope->settlements(
+            request()->attributes->get('activeTenant'),
+            request()->attributes->get('activeMembership'),
+        )->with('items')->findOrFail($settlementId);
 
         $this->resetValidation();
         $this->selectedSettlementId = $settlement->id;
@@ -275,6 +279,7 @@ class CollectionsDashboard extends Component
     public function render(): View
     {
         $membership = request()->attributes->get('activeMembership');
+        $settlementScope = app(CashSettlementScopeService::class);
         Gate::authorize('payments.view');
         $tenantId = $membership->tenant_id;
         $declarations = CollectionDeclaration::forTenant($tenantId);
@@ -282,14 +287,14 @@ class CollectionsDashboard extends Component
         $routes = CollectionRoute::forTenant($tenantId)->with(['collectorMembership.user'])->withCount('visits')->latest('route_date')->limit(20)->get();
         $openIncidents = CollectionIncident::forTenant($tenantId)->where('status', 'open')->count();
         $pendingSettlements = Gate::allows('settlements.view')
-            ? CashSettlement::forTenant($tenantId)->where('status', 'submitted')->count()
+            ? $settlementScope->settlements($membership->tenant, $membership)->where('status', 'submitted')->count()
             : 0;
 
         $settlements = collect();
         $selectedSettlement = null;
         $settlementHistory = collect();
         if (Gate::allows('settlements.view')) {
-            $settlementQuery = CashSettlement::forTenant($tenantId)
+            $settlementQuery = $settlementScope->settlements($membership->tenant, $membership)
                 ->with(['route.collectorMembership.user', 'presenter', 'reviewer'])
                 ->latest('submitted_at');
             if ($this->settlementStatus !== 'all') {
@@ -298,7 +303,7 @@ class CollectionsDashboard extends Component
             $settlements = $settlementQuery->limit(50)->get();
 
             if ($this->selectedSettlementId) {
-                $selectedSettlement = CashSettlement::forTenant($tenantId)
+                $selectedSettlement = $settlementScope->settlements($membership->tenant, $membership)
                     ->with(['route.collectorMembership.user', 'presenter', 'reviewer', 'items.component.declaration.customer', 'items.component.declaration.visit.sale'])
                     ->findOrFail($this->selectedSettlementId);
                 $settlementHistory = AuditEvent::query()->where('tenant_id', $tenantId)

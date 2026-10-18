@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Collections\CashSettlementScopeService;
 use App\Domain\Collections\CashSettlementService;
-use App\Domain\Tenancy\AuthorizationService;
 use App\Models\CashSettlement;
 use App\Models\CollectionRoute;
 use Illuminate\Http\JsonResponse;
@@ -11,14 +11,10 @@ use Illuminate\Http\Request;
 
 class CashSettlementApiController extends Controller
 {
-    public function index(Request $request, AuthorizationService $authorization): JsonResponse
+    public function index(Request $request, CashSettlementScopeService $scope): JsonResponse
     {
         $membership = $request->attributes->get('activeMembership');
-        abort_unless($authorization->allows($membership, 'settlements.view'), 403);
-        $query = CashSettlement::forTenant($membership->tenant_id)->latest();
-        if ($authorization->decision($membership, 'settlements.view')['scope'] === 'own') {
-            $query->where('collector_id', $request->user()->id);
-        }
+        $query = $scope->settlements($request->attributes->get('activeTenant'), $membership)->latest();
 
         return response()->json(['data' => $query->paginate(30)]);
     }

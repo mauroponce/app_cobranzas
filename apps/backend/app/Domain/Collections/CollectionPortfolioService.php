@@ -3,7 +3,6 @@
 namespace App\Domain\Collections;
 
 use App\Domain\Tenancy\AuthorizationService;
-use App\Models\CollectionTeamMember;
 use App\Models\Customer;
 use App\Models\CustomerCollectorAssignment;
 use App\Models\Tenant;
@@ -12,7 +11,10 @@ use Illuminate\Database\Eloquent\Builder;
 
 final class CollectionPortfolioService
 {
-    public function __construct(private AuthorizationService $authorization) {}
+    public function __construct(
+        private AuthorizationService $authorization,
+        private CollectionAssignmentScope $assignmentScope,
+    ) {}
 
     /** @return Builder<Customer> */
     public function customers(Tenant $tenant, TenantMembership $membership, string $capability = 'customers.view'): Builder
@@ -20,15 +22,41 @@ final class CollectionPortfolioService
         $decision = $this->authorization->decision($membership, $capability);
         abort_unless($decision['allowed'], 403);
 
-        $query = Customer::forTenant($tenant);
-        if ($decision['scope'] === 'all') {
-            return $query;
-        }
-        if (! in_array($decision['scope'], ['assigned', 'team'], true)) {
-            abort(403);
+        return $this->scopeCustomers(Customer::forTenant($tenant), $tenant, $membership, $decision['scope']);
+    }
+
+    public function canViewCustomer(Tenant $tenant, TenantMembership $membership, Customer $customer, string $capability = 'customers.view'): bool
+    {
+        if ($customer->tenant_id !== $tenant->id) {
+            return false;
         }
 
-        return $query->whereIn('customers.id', $this->customerIds($tenant, $membership, $decision['scope']));
+        $decision = $this->authorization->decision($membership, $capability);
+        if (! $decision['allowed']) {
+            return false;
+        }
+
+        return $this->scopeCustomers(Customer::forTenant($tenant), $tenant, $membership, $decision['scope'])
+            ->whereKey($customer->id)
+            ->exists();
+    }
+
+    /** @param Builder<Customer> $query
+     * @return Builder<Customer>
+     */
+    private function scopeCustomers(Builder $query, Tenant $tenant, TenantMembership $membership, ?string $scope): Builder
+    {
+        if ($scope === 'all') {
+            return $query;
+        }
+
+        if ($scope === 'own') {
+            return $query->whereHas('sales', fn (Builder $sales) => $sales->where('seller_id', $membership->user_id));
+        }
+
+        abort_unless(in_array($scope, ['assigned', 'team'], true), 403);
+
+        return $query->whereIn('customers.id', $this->customerIds($tenant, $membership, $scope));
     }
 
     public function canCollect(Tenant $tenant, TenantMembership $membership, Customer $customer): bool
@@ -68,29 +96,8 @@ final class CollectionPortfolioService
                 ->select('customer_collector_assignments.customer_id');
         }
 
-        $supervisedTeams = CollectionTeamMember::query()
-            ->select('collection_team_members.team_id')
-            ->join('collection_teams', function ($join) use ($tenant): void {
-                $join->on('collection_teams.id', '=', 'collection_team_members.team_id')
-                    ->where('collection_teams.tenant_id', $tenant->id)
-                    ->where('collection_teams.status', 'active');
-            })
-            ->where('collection_team_members.tenant_id', $tenant->id)
-            ->where('collection_team_members.membership_id', $membership->id)
-            ->where('collection_team_members.team_role', 'supervisor')
-            ->whereNull('collection_team_members.left_at');
-
-        return $assignments->whereIn('customer_collector_assignments.collector_membership_id', function ($query) use ($tenant, $supervisedTeams): void {
-            $query->select('collection_team_members.membership_id')
-                ->from('collection_team_members')
-                ->join('tenant_memberships', function ($join) use ($tenant): void {
-                    $join->on('tenant_memberships.id', '=', 'collection_team_members.membership_id')
-                        ->where('tenant_memberships.tenant_id', $tenant->id)
-                        ->where('tenant_memberships.status', 'active');
-                })
-                ->where('collection_team_members.tenant_id', $tenant->id)
-                ->whereNull('collection_team_members.left_at')
-                ->whereIn('collection_team_members.team_id', $supervisedTeams);
-        })->select('customer_collector_assignments.customer_id');
+        return $assignments
+            ->whereIn('customer_collector_assignments.collector_membership_id', $this->assignmentScope->membershipIds($tenant, $membership, $scope))
+            ->select('customer_collector_assignments.customer_id');
     }
 }

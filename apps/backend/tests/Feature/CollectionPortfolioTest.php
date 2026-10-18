@@ -75,8 +75,21 @@ class CollectionPortfolioTest extends TestCase
 
         $token = $collector->user->createToken('portfolio')->plainTextToken;
         $this->withToken($token)->postJson('/api/v1/tenant/select', ['tenant_id' => $owner->tenant_id])->assertOk();
+        $this->withToken($token)->getJson('/api/v1/customers')->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $assigned->id);
+        $this->withToken($token)->getJson('/api/v1/customers/'.$assigned->id)->assertOk();
+        $this->withToken($token)->getJson('/api/v1/customers/'.$outside->id)->assertForbidden();
+        $this->withToken($token)->getJson('/api/v1/customers/'.$outside->id.'/addresses')->assertForbidden();
         $pull = $this->withToken($token)->getJson('/api/v1/sync/pull?cursor=0')->assertOk();
         $pull->assertJsonCount(1, 'data.customers')->assertJsonPath('data.customers.0.id', $assigned->id);
+
+        $this->actingAs($collector->user)->withSession(['active_tenant_id' => $owner->tenant_id])
+            ->get('/admin/customers')->assertOk()
+            ->assertSee($assigned->customer_number)
+            ->assertDontSee($outside->customer_number);
+        $this->get('/admin/customers/'.$assigned->id)->assertOk();
+        $this->get('/admin/customers/'.$outside->id)->assertForbidden();
         foreach ([$assigned, $outside] as $customer) {
             try {
                 app(PaymentService::class)->registerCash($owner->tenant, $collector->user, ['customer_id' => $customer->id, 'amount' => '10.00']);
@@ -93,17 +106,80 @@ class CollectionPortfolioTest extends TestCase
         $owner = $this->member('owner');
         $supervisor = $this->member('supervisor', $owner->tenant);
         $collector = $this->member('collector', $owner->tenant);
+        $outsideCollector = $this->member('collector', $owner->tenant);
         $customer = $this->customer($owner);
+        $outside = $this->customer($owner);
         app(CollectionAssignmentService::class)->assign($owner->tenant, $owner->user, $customer, $collector);
+        app(CollectionAssignmentService::class)->assign($owner->tenant, $owner->user, $outside, $outsideCollector);
         $team = CollectionTeam::create(['tenant_id' => $owner->tenant_id, 'name' => 'Norte', 'status' => 'active']);
         CollectionTeamMember::create(['tenant_id' => $owner->tenant_id, 'team_id' => $team->id, 'membership_id' => $supervisor->id, 'team_role' => 'supervisor', 'joined_at' => now()]);
         CollectionTeamMember::create(['tenant_id' => $owner->tenant_id, 'team_id' => $team->id, 'membership_id' => $collector->id, 'team_role' => 'collector', 'joined_at' => now()]);
 
         $token = $supervisor->user->createToken('team')->plainTextToken;
         $this->withToken($token)->postJson('/api/v1/tenant/select', ['tenant_id' => $owner->tenant_id])->assertOk();
+        $this->withToken($token)->getJson('/api/v1/customers')->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $customer->id);
+        $this->withToken($token)->getJson('/api/v1/customers/'.$customer->id)->assertOk();
+        $this->withToken($token)->getJson('/api/v1/customers/'.$outside->id)->assertForbidden();
         $this->withToken($token)->getJson('/api/v1/sync/pull?cursor=0')->assertOk()->assertJsonPath('data.customers.0.id', $customer->id);
+
         CollectionTeamMember::where('membership_id', $supervisor->id)->update(['left_at' => now()]);
+        $this->withToken($token)->getJson('/api/v1/customers')->assertOk()->assertJsonCount(0, 'data');
         $this->withToken($token)->getJson('/api/v1/sync/pull?cursor=0')->assertOk()->assertJsonCount(0, 'data.customers');
+        CollectionTeamMember::create(['tenant_id' => $owner->tenant_id, 'team_id' => $team->id, 'membership_id' => $supervisor->id, 'team_role' => 'supervisor', 'joined_at' => now()]);
+
+        $this->actingAs($supervisor->user)->withSession(['active_tenant_id' => $owner->tenant_id])
+            ->get('/admin/customers')->assertOk()
+            ->assertSee($customer->customer_number)
+            ->assertDontSee($outside->customer_number);
+        $this->get('/admin/customers/'.$outside->id)->assertForbidden();
+    }
+
+    public function test_own_customer_scope_is_consistent_between_web_and_api(): void
+    {
+        $owner = $this->member('owner');
+        $seller = $this->member('seller', $owner->tenant);
+        $own = $this->customer($owner);
+        $outside = $this->customer($owner);
+        $this->debt($seller, $own);
+        $this->debt($owner, $outside);
+        app(AuthorizationManagementService::class)->setOverride(
+            $owner->tenant,
+            $owner->user,
+            $seller,
+            Permission::where('key', 'customers.view')->firstOrFail(),
+            'allow',
+            'own',
+        );
+
+        $token = $seller->user->createToken('own-customers')->plainTextToken;
+        $this->withToken($token)->postJson('/api/v1/tenant/select', ['tenant_id' => $owner->tenant_id])->assertOk();
+        $this->withToken($token)->getJson('/api/v1/customers')->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $own->id);
+        $this->withToken($token)->getJson('/api/v1/customers/'.$outside->id)->assertForbidden();
+
+        $this->actingAs($seller->user)->withSession(['active_tenant_id' => $owner->tenant_id])
+            ->get('/admin/customers')->assertOk()
+            ->assertSee($own->customer_number)
+            ->assertDontSee($outside->customer_number);
+        $this->get('/admin/customers/'.$outside->id)->assertForbidden();
+    }
+
+    public function test_customer_scope_never_crosses_tenants(): void
+    {
+        $owner = $this->member('owner');
+        $collector = $this->member('collector', $owner->tenant);
+        $foreignOwner = $this->member('owner');
+        $foreignCustomer = $this->customer($foreignOwner);
+
+        $token = $collector->user->createToken('tenant-isolation')->plainTextToken;
+        $this->withToken($token)->postJson('/api/v1/tenant/select', ['tenant_id' => $owner->tenant_id])->assertOk();
+        $this->withToken($token)->getJson('/api/v1/customers/'.$foreignCustomer->id)->assertNotFound();
+
+        $this->actingAs($collector->user)->withSession(['active_tenant_id' => $owner->tenant_id])
+            ->get('/admin/customers/'.$foreignCustomer->id)->assertNotFound();
     }
 
     public function test_sync_pull_only_includes_today_route_stops_assigned_to_the_collector(): void

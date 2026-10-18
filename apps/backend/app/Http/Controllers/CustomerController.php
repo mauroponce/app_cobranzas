@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Collections\CollectionPortfolioService;
 use App\Domain\Commercial\CustomerService;
 use App\Domain\Tenancy\Audit;
 use App\Models\Customer;
@@ -15,12 +16,12 @@ use Illuminate\Validation\ValidationException;
 
 class CustomerController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, CollectionPortfolioService $portfolio)
     {
         Gate::authorize('customers.view');
         $tenant = $request->attributes->get('activeTenant');
         $filters = $request->validate(['search' => ['nullable', 'string', 'max:100'], 'status' => ['nullable', Rule::in(['active', 'inactive', 'blocked'])]]);
-        $customers = Customer::forTenant($tenant)->when($filters['search'] ?? null, function ($query, $search) {
+        $customers = $portfolio->customers($tenant, $request->attributes->get('activeMembership'))->when($filters['search'] ?? null, function ($query, $search) {
             $query->where(function ($query) use ($search) {
                 $query->where('first_name', 'ilike', "%$search%")->orWhere('last_name', 'ilike', "%$search%")
                     ->orWhere('customer_number', 'ilike', "%$search%")->orWhere('document_normalized', 'ilike', '%'.preg_replace('/[^A-Z0-9]/', '', strtoupper($search)).'%');

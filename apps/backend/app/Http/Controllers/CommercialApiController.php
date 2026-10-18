@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Domain\Tenancy\AuthorizationService;
+use App\Domain\Collections\CollectionPortfolioService;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\PriceList;
@@ -15,37 +15,34 @@ use Illuminate\Support\Facades\Gate;
 
 class CommercialApiController extends Controller
 {
-    public function customers(Request $request, AuthorizationService $authorization): JsonResponse
+    public function customers(Request $request, CollectionPortfolioService $portfolio): JsonResponse
     {
         Gate::authorize('customers.view');
         $tenant = $request->attributes->get('activeTenant');
         $membership = $request->attributes->get('activeMembership');
         $search = $request->validate(['search' => ['nullable', 'string', 'max:100']])['search'] ?? null;
-        $page = Customer::forTenant($tenant)
-            ->when($authorization->decision($membership, 'customers.view')['scope'] === 'own', fn ($query) => $query->whereHas('sales', fn ($sales) => $sales->where('seller_id', $request->user()->id)))
+        $page = $portfolio->customers($tenant, $membership)
             ->when($search, fn ($q) => $q->where(fn ($q) => $q->where('first_name', 'ilike', "%$search%")->orWhere('last_name', 'ilike', "%$search%")))->orderBy('last_name')->paginate(20);
 
         return response()->json(['data' => $page->getCollection()->map(fn ($customer) => $this->customerData($customer)), 'meta' => ['current_page' => $page->currentPage(), 'last_page' => $page->lastPage()]]);
     }
 
-    public function customer(Request $request, Customer $customer, AuthorizationService $authorization): JsonResponse
+    public function customer(Request $request, Customer $customer, CollectionPortfolioService $portfolio): JsonResponse
     {
         Gate::authorize('customers.view');
-        abort_unless($customer->tenant_id === $request->attributes->get('activeTenant')->id, 404);
-        if ($authorization->decision($request->attributes->get('activeMembership'), 'customers.view')['scope'] === 'own') {
-            abort_unless($customer->sales()->where('seller_id', $request->user()->id)->exists(), 403);
-        }
+        $tenant = $request->attributes->get('activeTenant');
+        abort_unless($customer->tenant_id === $tenant->id, 404);
+        abort_unless($portfolio->canViewCustomer($tenant, $request->attributes->get('activeMembership'), $customer), 403);
 
         return response()->json(['data' => $this->customerData($customer)]);
     }
 
-    public function addresses(Request $request, Customer $customer, AuthorizationService $authorization): JsonResponse
+    public function addresses(Request $request, Customer $customer, CollectionPortfolioService $portfolio): JsonResponse
     {
         Gate::authorize('customers.view');
-        abort_unless($customer->tenant_id === $request->attributes->get('activeTenant')->id, 404);
-        if ($authorization->decision($request->attributes->get('activeMembership'), 'customers.view')['scope'] === 'own') {
-            abort_unless($customer->sales()->where('seller_id', $request->user()->id)->exists(), 403);
-        }
+        $tenant = $request->attributes->get('activeTenant');
+        abort_unless($customer->tenant_id === $tenant->id, 404);
+        abort_unless($portfolio->canViewCustomer($tenant, $request->attributes->get('activeMembership'), $customer), 403);
         $addresses = CustomerAddress::forTenant($customer->tenant_id)->where('customer_id', $customer->id)->orderByDesc('is_primary')->get()
             ->map(fn ($address) => $address->only(['id', 'label', 'street', 'street_number', 'floor', 'unit', 'neighborhood', 'city', 'province', 'postal_code', 'country', 'reference', 'latitude', 'longitude', 'is_primary']));
 

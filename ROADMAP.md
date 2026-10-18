@@ -2,7 +2,7 @@
 
 > **Punto único de seguimiento del producto.** Este archivo indica qué hacer ahora, qué sigue, qué está bloqueado y cómo comprobar que una entrega terminó. No reemplaza las definiciones funcionales ni la arquitectura detallada.
 >
-> **Última revisión del roadmap:** 2026-10-17. **Base pública verificada:** `main` y `origin/main` en `7a18bb44213769d31a9c56a3f2f9d13c1d6854fc` (commit del 2026-10-17). La estabilización de cobranzas está integrada, pero no validada: el CI móvil pasó, el CI backend falló y aún falta una revisión independiente.
+> **Última revisión del roadmap:** 2026-10-17. **Base pública verificada:** `main` y `origin/main` en `c8e939bc2f658590d49253d78b4c8c1baeb8afcd` (commit del 2026-10-17). C-01 y C-02 están integrados, pero no validados: el CI backend del commit vigente falló y aún falta una revisión independiente.
 
 ## 1. Dirección del producto
 
@@ -43,8 +43,8 @@ Si hay contradicción, **no inventar un comportamiento para resolverla**: identi
 | Orden | ID | Entrega | Prioridad | Estado | Dependencia / condición de salida |
 |---|---|---|---|---|---|
 | 1 | **C-01** | Estabilización del dominio de cobranzas | P0 | **IMPLEMENTADO / SIN VALIDAR** | Revisión independiente; obtener CI backend verde; repetir verificaciones sobre el commit vigente |
-| 2 | **C-02** | Completar formularios administrativos de diferencias y reasignaciones | P0 | **IMPLEMENTADO / SIN VALIDAR** | C-01 continúa sin validar; falta revisión independiente, CI verde e integración de C-02 |
-| 3 | **C-03** | Jornada completa y rendición en entorno de pruebas | P0 | **BLOQUEADO** | C-01 y C-02; migraciones seguras; prueba de punta a punta |
+| 2 | **C-02** | Completar formularios administrativos de diferencias y reasignaciones | P0 | **IMPLEMENTADO / SIN VALIDAR** | C-01 continúa sin validar; falta revisión independiente y CI verde |
+| 3 | **C-03** | Jornada completa y rendición en entorno de pruebas | P0 | **IMPLEMENTADO / SIN VALIDAR** | Revisión independiente; CI backend verde; prueba móvil visual; concurrencia administrativa; migración sobre copia anonimizada representativa |
 | 4 | **C-04** | Piloto controlado de cobranzas con Trotamundo | P0 | **BLOQUEADO** | C-03 y aceptación operativa, soporte y respaldo definidos |
 | 5 | **I-01** | Diseñar importación Excel/CSV y saldos de apertura | P1 | **PENDIENTE** | Definir fuentes reales anonimizadas, contratos y criterios de conciliación |
 | 6 | **I-02** | Implementar importación determinística con previsualización | P1 | **BLOQUEADO** | Plan I-01 y dominio financiero estable |
@@ -58,9 +58,9 @@ Si hay contradicción, **no inventar un comportamiento para resolverla**: identi
 | 14 | **L-01** | Entregas y repartidor que también recibe dinero | P2 | **BLOQUEADO** | Empresa piloto concreta, discovery fit-gap y M-02 |
 | 15 | **X-01** | Integraciones WhatsApp / Mercado Pago / bancos | P3 | **PENDIENTE** | Casos concretos, permisos, verificación y diseño de idempotencia |
 
-**Contraste de estados del 2026-10-17:** C-01 está integrado en `main`, pero conserva `IMPLEMENTADO / SIN VALIDAR` por el CI backend fallido y la revisión pendiente. C-02 está implementado en la rama local `feat/c-02-admin-collections-forms`, con verificaciones locales aprobadas; no está validado porque falta revisión independiente, CI verde e integración, y porque C-01 continúa sin validarse. O-01 mantiene `EN PLAN` por la documentación de `docs/platform/`; no hay evidencia de operación real. No se encontró evidencia suficiente para avanzar los demás estados.
+**Contraste de estados del 2026-10-17:** C-01 y C-02 están integrados en `main`, pero conservan `IMPLEMENTADO / SIN VALIDAR` por el CI backend fallido y la revisión pendiente. C-03 ejecutó el recorrido financiero integral y backup/restauración sobre infraestructura sintética aislada; conserva `IMPLEMENTADO / SIN VALIDAR` por los límites detallados en `docs/validation/c03-collection-day.md`. O-01 mantiene `EN PLAN` por la documentación de `docs/platform/`; no hay evidencia de operación real. No se encontró evidencia suficiente para avanzar los demás estados.
 
-**Próxima tarea de ingeniería recomendada:** ejecutar `$dev-review` independiente sobre C-02 y, en paralelo solo si no se mezclan alcances, cerrar la revisión y el fallo de CI backend de C-01. C-03 permanece bloqueado hasta que ambas entregas estén validadas.
+**Próxima tarea de ingeniería recomendada:** diagnosticar el CI backend del commit vigente y ejecutar `$dev-review` independiente de C-01/C-02/C-03. Después, completar la inspección móvil interactiva, la carrera de aprobación administrativa y la migración sobre copia anonimizada representativa. No iniciar C-04 mientras C-03 no esté validado.
 
 ## 4. Evidencia existente y criterios de aceptación por hito
 
@@ -84,21 +84,25 @@ La implementación del flujo declaraciones → rendición por hoja → conciliac
 
 ### C-02 — Completar operación administrativa
 
-Los formularios Livewire para **atribuir diferencias** y **reasignar visitas** están implementados en la rama local `feat/c-02-admin-collections-forms`. Reutilizan los servicios del dominio y conservan la segregación por tenant; no se agregaron migraciones ni reglas financieras nuevas.
+Los formularios Livewire para **atribuir diferencias** y **reasignar visitas** están integrados en `main` mediante `c8e939b`. Reutilizan los servicios del dominio y conservan la segregación por tenant; no se agregaron migraciones ni reglas financieras nuevas.
 
 - [x] Administración puede conciliar rendiciones sin diferencia o con atribución manual explícita y reasignar visitas pendientes por UI, con confirmación, validación y permiso de servidor.
 - [x] Se muestran detalle, importes, diferencias, conflictos, historial, auditoría e incidencias relacionadas en modo lectura; no se corrigen datos silenciosamente.
 - [x] Pruebas Livewire/integración cubren tenant, permisos, doble/autorrevisión, importes inválidos, atribuciones, reasignaciones válidas e inválidas, estado obsoleto, persistencia y ausencia de efectos financieros ante errores.
 
-**Evidencia local del 2026-10-17:** `make test` sobre `app_cobranzas_test` aprobó 117 pruebas / 620 aserciones; Pint aprobó 191 archivos; `make assets` generó el bundle de producción. La suite nueva está en `apps/backend/tests/Feature/CollectionsAdministrationTest.php` (13 pruebas). Falta `$dev-review`, CI remoto y commit/PR integrado; por eso C-02 no está `VALIDADO`.
+**Evidencia local del 2026-10-17:** `make test` sobre `app_cobranzas_test` aprobó 117 pruebas / 620 aserciones; Pint aprobó 191 archivos; `make assets` generó el bundle de producción. La suite nueva está en `apps/backend/tests/Feature/CollectionsAdministrationTest.php` (13 pruebas). El [CI Backend #17](https://github.com/mauroponce/app_cobranzas/actions/runs/39070359160) del commit integrado falló en `php artisan test`; falta además `$dev-review`, por eso C-02 no está `VALIDADO`.
 
 ### C-03 — Ensayo de jornada completa (staging)
 
-- [ ] Aplicar migraciones incrementales en una base de pruebas representativa, con backup/restauración comprobable.
-- [ ] Venta financiada → cuotas → asignación → ruta → visitas/cobros offline → sincronización → rendición → conciliación → saldos y auditoría.
-- [ ] Probar efectivo, transferencia, pagos combinados, diferencias, duplicados, cambios de cartera y conectividad intermitente.
-- [ ] Confirmar bloqueos de cierre y límites: solo el dispositivo que presenta la hoja puede afirmar que su outbox está vacía.
-- [ ] Registrar procedimiento de soporte ante incidencias y criterio de aceptación operativo.
+- [x] Aplicar las 22 migraciones incrementales en `app_cobranzas_c03_test`, con volumen propio, servicios externos anulados y backup/restauración comprobados sobre datos sintéticos.
+- [x] Venta financiada → cuotas → asignación → ruta → declaración combinada por API móvil → sincronización → rendición → conciliación → saldos y auditoría.
+- [x] Probar efectivo, transferencia, pago combinado, diferencia, reintento idéntico, UUID conflictivo, cambio de cartera, reasignación, revocaciones y conectividad intermitente mediante la prueba vertical y suites existentes.
+- [x] Confirmar bloqueos de cierre y documentar el límite: solo el dispositivo que presenta la hoja puede afirmar que su outbox está vacía.
+- [x] Registrar procedimiento de soporte y guion manual en [`docs/validation/c03-collection-day.md`](docs/validation/c03-collection-day.md).
+- [ ] Repetir migración y medición sobre una copia anonimizada representativa; los datos usados en esta ejecución fueron sintéticos.
+- [ ] Completar interacción visual móvil y prueba simultánea de dos administradores; obtener CI backend verde y revisión independiente.
+
+**Evidencia C-03 del 2026-10-17:** `CollectionsEndToEndTest` aprobó el escenario exacto con 48 aserciones: venta A `$ 300.000,00` en 3 × `$ 100.000,00`, venta B `$ 60.000,00`, declaración `$ 30.000,00` efectivo + `$ 50.000,00` transferencia, recepción `$ 25.000,00`, diferencia `$ 5.000,00` y saldos finales A `$ 225.000,00`, B `$ 60.000,00`, total `$ 285.000,00`. La suite final aprobó 118 pruebas / 668 aserciones, Pint 192 archivos, assets, TypeScript, ESLint, Prettier y Jest (3 suites / 16 pruebas). Origen y restauración conservaron 22 migraciones, 69 tablas y el tenant sintético. El AVD Android inició y aceptó el APK, pero Metro no abrió el puerto por espera de I/O; no existe evidencia visual suficiente. C-03 no está `VALIDADO` y C-04 continúa bloqueado.
 
 ### I-01 / I-02 — Importación desde Excel sin inventar deuda
 

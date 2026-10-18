@@ -1,0 +1,72 @@
+services:
+  app:
+    environment:
+      APP_ENV: testing
+      APP_DEBUG: "false"
+      DB_DATABASE: app_cobranzas_c03_test
+      DB_USERNAME: app_cobranzas_c03
+      DB_PASSWORD: c03-local-validation-only
+      CACHE_STORE: array
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: array
+      MAIL_MAILER: array
+      RESEND_API_KEY: ""
+      R2_ACCESS_KEY_ID: ""
+      R2_SECRET_ACCESS_KEY: ""
+      R2_BUCKET: ""
+      R2_ENDPOINT: ""
+  queue:
+    environment:
+      APP_ENV: testing
+      DB_DATABASE: app_cobranzas_c03_test
+      DB_USERNAME: app_cobranzas_c03
+      DB_PASSWORD: c03-local-validation-only
+      CACHE_STORE: array
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: array
+      MAIL_MAILER: array
+      RESEND_API_KEY: ""
+      R2_ACCESS_KEY_ID: ""
+      R2_SECRET_ACCESS_KEY: ""
+      R2_BUCKET: ""
+      R2_ENDPOINT: ""
+  scheduler:
+    environment:
+      APP_ENV: testing
+      DB_DATABASE: app_cobranzas_c03_test
+      DB_USERNAME: app_cobranzas_c03
+      DB_PASSWORD: c03-local-validation-only
+      CACHE_STORE: array
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: array
+      MAIL_MAILER: array
+      RESEND_API_KEY: ""
+      R2_ACCESS_KEY_ID: ""
+      R2_SECRET_ACCESS_KEY: ""
+      R2_BUCKET: ""
+      R2_ENDPOINT: ""
+  postgres:
+    environment:
+      POSTGRES_DB: app_cobranzas_c03_test
+      POSTGRES_USER: app_cobranzas_c03
+      POSTGRES_PASSWORD: c03-local-validation-only
+    ports: !override
+      - "127.0.0.1:${C03_DB_PORT:-55433}:5432"
+    volumes: !override
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app_cobranzas_c03 -d app_cobranzas_c03_test"]
+  redis:
+    volumes: !override
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+    external: false
+    name: app-cobranzas-c03_postgres_data
+  redis_data:
+    name: app-cobranzas-c03_redis_data
+  backend_vendor:
+    name: app-cobranzas-c03_backend_vendor
+  backend_assets:
+    name: app-cobranzas-c03_backend_assets

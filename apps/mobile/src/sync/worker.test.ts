@@ -1,5 +1,5 @@
 import { getMetadata } from '../database/database';
-import { syncInfo } from '../database/financial';
+import { pendingCount, syncInfo } from '../database/financial';
 import { queueOfflineCashPayment, queueOfflineCollectionDeclaration } from './outbox';
 import { syncNow } from './worker';
 import { apiGet, apiPost } from '../services/api/client';
@@ -146,6 +146,7 @@ describe('sync worker', () => {
       status: 'pending_review',
       payment_id: 'declaration-server-1',
     });
+    expect(await pendingCount('tenant-a:user-a')).toBe(0);
   });
 
   it('continues paginated pull from the persisted cursor', async () => {
@@ -185,6 +186,7 @@ describe('sync worker', () => {
         status: status === '401' ? 'blocked_auth' : 'blocked_authorization',
       });
       expect(sqliteRows().payments.get('operation-1')).toMatchObject({ status: 'pending_sync' });
+      expect(await pendingCount('tenant-a:user-a')).toBe(1);
     },
   );
 
